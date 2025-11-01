@@ -1,0 +1,313 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Developer Theme (Default) - Darker with Vibrant Royal Purple */
+:root {
+  --background: hsl(220, 13%, 9%);
+  --foreground: hsl(220, 9%, 98%);
+  --card: hsl(220, 13%, 11%);
+  --card-foreground: hsl(220, 9%, 98%);
+  --popover: hsl(220, 13%, 11%);
+  --popover-foreground: hsl(220, 9%, 98%);
+  --primary: hsl(262, 80%, 65%);
+  --primary-foreground: hsl(220, 9%, 98%);
+  --secondary: hsl(215, 25%, 16%);
+  --secondary-foreground: hsl(220, 9%, 98%);
+  --muted: hsl(215, 25%, 16%);
+  --muted-foreground: hsl(220, 5%, 65%);
+  --accent: hsl(215, 25%, 16%);
+  --accent-foreground: hsl(220, 9%, 98%);
+  --destructive: hsl(0, 62%, 56%);
+  --destructive-foreground: hsl(220, 9%, 98%);
+  --border: hsl(215, 25%, 18%);
+  --input: hsl(215, 25%, 18%);
+  --ring: hsl(262, 80%, 65%);
+  --radius: 0.75rem;
+
+  /* Chart colors */
+  --chart-1: hsl(262, 80%, 65%);
+  --chart-2: hsl(159, 100%, 36%);
+  --chart-3: hsl(42, 92%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+
+  /* Sidebar colors */
+  --sidebar: hsl(220, 13%, 11%);
+  --sidebar-foreground: hsl(220, 9%, 98%);
+  --sidebar-primary: hsl(262, 80%, 65%);
+  --sidebar-primary-foreground: hsl(220, 9%, 98%);
+  --sidebar-accent: hsl(215, 25%, 16%);
+  --sidebar-accent-foreground: hsl(220, 9%, 98%);
+  --sidebar-border: hsl(215, 25%, 18%);
+  --sidebar-ring: hsl(262, 80%, 65%);
+
+  /* Font families */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Shadows */
+  --shadow-2xs: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00);
+  --shadow-xs: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00);
+  --shadow-sm: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00), 0px 1px 2px -1px hsl(262, 80%, 65% / 0.00);
+  --shadow: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00), 0px 1px 2px -1px hsl(262, 80%, 65% / 0.00);
+  --shadow-md: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00), 0px 2px 4px -1px hsl(262, 80%, 65% / 0.00);
+  --shadow-lg: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00), 0px 4px 6px -1px hsl(262, 80%, 65% / 0.00);
+  --shadow-xl: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00), 0px 8px 10px -1px hsl(262, 80%, 65% / 0.00);
+  --shadow-2xl: 0px 2px 0px 0px hsl(262, 80%, 65% / 0.00);
+
+  /* Spacing and tracking */
+  --spacing: 0.25rem;
+  --tracking-normal: 0em;
+}
+
+/* Regular User Theme - Darker Gray with Purple/Blue/Cyan Gradient */
+.regular-user-theme {
+  --background: hsl(0, 0%, 8%);
+  --foreground: hsl(0, 0%, 95%);
+  --card: hsl(0, 0%, 10%);
+  --card-foreground: hsl(0, 0%, 95%);
+  --popover: hsl(0, 0%, 10%);
+  --popover-foreground: hsl(0, 0%, 95%);
+  --primary: hsl(270, 65%, 75%);
+  --primary-foreground: hsl(0, 0%, 10%);
+  --secondary: hsl(0, 0%, 12%);
+  --secondary-foreground: hsl(0, 0%, 95%);
+  --muted: hsl(0, 0%, 12%);
+  --muted-foreground: hsl(0, 0%, 60%);
+  --accent: hsl(0, 0%, 12%);
+  --accent-foreground: hsl(0, 0%, 95%);
+  --destructive: hsl(0, 62%, 56%);
+  --destructive-foreground: hsl(0, 0%, 95%);
+  --border: hsl(0, 0%, 14%);
+  --input: hsl(0, 0%, 14%);
+  --ring: hsl(270, 65%, 75%);
+
+  /* Chart colors for regular users */
+  --chart-1: hsl(270, 65%, 75%);
+  --chart-2: hsl(159, 100%, 36%);
+  --chart-3: hsl(42, 92%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+
+  /* Sidebar colors for regular users */
+  --sidebar: hsl(0, 0%, 10%);
+  --sidebar-foreground: hsl(0, 0%, 95%);
+  --sidebar-primary: hsl(270, 65%, 75%);
+  --sidebar-primary-foreground: hsl(0, 0%, 10%);
+  --sidebar-accent: hsl(0, 0%, 12%);
+  --sidebar-accent-foreground: hsl(0, 0%, 95%);
+  --sidebar-border: hsl(0, 0%, 14%);
+  --sidebar-ring: hsl(270, 65%, 75%);
+}
+
+/* Diagonal gradient overlay for regular users */
+.regular-user-theme::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg, 
+    hsla(270, 65%, 75%, 0.12) 0%,
+    hsla(200, 80%, 65%, 0.12) 50%,
+    hsla(180, 75%, 60%, 0.12) 100%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}
+
+/* Custom scrollbar styles */
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(215, 25%, 25%);
+  border-radius: 2px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(215, 25%, 35%);
+}
+
+/* Navigation styles */
+.nav-item.active {
+  background: linear-gradient(135deg, var(--primary), hsl(250, 80%, 70%));
+}
+
+/* Metric card styles */
+.metric-card {
+  background: linear-gradient(135deg, var(--card), hsl(220, 13%, 13%));
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -8px var(--primary);
+}
+
+/* Project card styles */
+.project-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.project-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 25px -8px var(--primary);
+}
+
+/* Status badge styles */
+.status-live {
+  background: linear-gradient(135deg, hsl(142, 76%, 36%), hsl(142, 76%, 46%));
+}
+
+.status-progress {
+  background: linear-gradient(135deg, hsl(48, 96%, 53%), hsl(48, 96%, 63%));
+}
+
+.status-not-started {
+  background: linear-gradient(135deg, hsl(220, 14%, 96%), hsl(220, 9%, 46%));
+}
+
+/* Progress bar styles */
+.progress-bar {
+  background: var(--muted);
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, var(--primary), hsl(250, 80%, 70%));
+}
+
+/* Modal styles */
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+/* Game icon styles */
+.game-icon {
+  width: 3rem;
+  height: 3rem;
+  background: linear-gradient(135deg, var(--primary), hsl(250, 80%, 70%));
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+/* Floating action button styles */
+.floating-action {
+  background: linear-gradient(135deg, var(--primary), hsl(250, 80%, 70%));
+  box-shadow: 0 8px 25px -8px var(--primary);
+}
+
+.floating-action:hover {
+  transform: scale(1.05);
+}
+
+/* Animation styles */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* Team avatar styles */
+.team-avatar {
+  border: 2px solid var(--border);
+}
+
+/* Chart container styles */
+.chart-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+/* Custom button variants */
+.btn-gameforge {
+  background: linear-gradient(135deg, var(--primary), hsl(250, 80%, 70%));
+  color: var(--primary-foreground);
+  transition: all 0.3s ease;
+}
+
+.btn-gameforge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px -8px var(--primary);
+}
+
+/* Buttonz entrance animations */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Buttonz avatar styling - ensure images are circular with purple theme */
+[data-testid^="button-user"] .rounded-full img,
+[data-testid^="button-user"] .rounded-full > span {
+  border-radius: 9999px !important;
+}
+
+[data-testid^="button-user"] .rounded-full {
+  border: 2px solid hsl(262, 80%, 65%, 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(262, 80%, 65%, 0.1) !important;
+}
