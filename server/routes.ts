@@ -679,7 +679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Add game to library
-      const libraryItem = await storage.addGameToLibrary({
+      const libraryItem = await storage.addToGameLibrary({
         userId: req.session.userId,
         gameId: game_id,
         gameName: game_name,
@@ -688,7 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         purchasedAt: new Date(),
         lastPlayed: null,
         playTime: 0,
-        favorite: false,
+        favorite: 0,
       });
 
       res.status(201).json(libraryItem);
