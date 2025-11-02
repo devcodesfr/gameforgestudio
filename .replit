@@ -8,3 +8,14 @@ integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_mem_db:1.
 
 [nix]
 channel = "stable-25_05"
+
+[workflows]
+
+[[workflows.workflow]]
+name = "Start application"
+mode = "sequential"
+author = 49078122
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
