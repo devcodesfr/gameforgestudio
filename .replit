@@ -1,0 +1,10 @@
+modules = ["nodejs-20"]
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[agent]
+integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_mem_db:1.0.0"]
+
+[nix]
+channel = "stable-25_05"
