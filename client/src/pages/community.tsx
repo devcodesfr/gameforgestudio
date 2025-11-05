@@ -24,6 +24,8 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { calendarIntegration } from '@/lib/calendar-integration';
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useLocation } from 'wouter';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommunityPageProps {
   sidebarCollapsed?: boolean;
@@ -101,6 +103,8 @@ const MOCK_POSTS: any[] = [
 export default function CommunityPage({ sidebarCollapsed = false }: CommunityPageProps) {
   // Get real authenticated user data
   const userQuery = useCurrentUser();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
   
   // Handle loading state
   if (userQuery.isLoading) {
@@ -190,6 +194,35 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
     }));
   };
 
+  const handleLikeReply = (postId: string, replyId: string) => {
+    let updatedPost: any = null;
+    
+    setPosts(prev => prev.map(post => {
+      if (post.id === postId) {
+        updatedPost = {
+          ...post,
+          replies: post.replies.map((reply: any) => {
+            if (reply.id === replyId) {
+              return {
+                ...reply,
+                liked: !reply.liked,
+                likesCount: reply.liked ? reply.likesCount - 1 : reply.likesCount + 1
+              };
+            }
+            return reply;
+          })
+        };
+        return updatedPost;
+      }
+      return post;
+    }));
+
+    // Update selectedPost if this was for the currently selected post
+    if (selectedPost && selectedPost.id === postId && updatedPost) {
+      setSelectedPost(updatedPost);
+    }
+  };
+
   const handleReply = (postId: string) => {
     if (!replyContent.trim()) return;
 
@@ -228,6 +261,41 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
 
     setReplyContent('');
     setReplyingTo(null);
+  };
+
+  const handleRsvpEvent = (post: any) => {
+    if (!post.event) return;
+
+    // Add event to calendar
+    const calendarEvent = {
+      id: post.event.id || `event-${Date.now()}`,
+      title: post.event.title,
+      description: post.content,
+      type: post.event.type,
+      startDate: post.event.startDate,
+      endDate: post.event.endDate,
+      location: post.event.location,
+      createdBy: post.authorId,
+      creator: post.author,
+      rsvpCount: post.event.rsvpCount || 0,
+      maxAttendees: post.event.maxAttendees,
+      userRsvp: 'attending' as const,
+      createdAt: post.createdAt
+    };
+
+    calendarIntegration.addEvent(calendarEvent);
+
+    // Show success toast
+    toast({
+      title: "RSVP Confirmed!",
+      description: `You're attending "${post.event.title}". Check your calendar for details.`,
+    });
+
+    // Close modal if open
+    setSelectedPost(null);
+
+    // Navigate to calendar
+    setLocation('/calendar');
   };
 
   const handleCreatePost = () => {
@@ -531,7 +599,10 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                             <div className="flex flex-col space-y-2">
                               <Button 
                                 size="sm" 
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRsvpEvent(post);
+                                }}
                                 data-testid={`button-rsvp-${post.event.id}`}
                               >
                                 <Calendar className="w-4 h-4 mr-2" />
@@ -655,7 +726,10 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLikeReply(post.id, reply.id);
+                                  }}
                                   className={`text-xs ${reply.liked ? 'text-red-500' : ''}`}
                                   data-testid={`button-like-reply-${reply.id}`}
                                 >
@@ -756,7 +830,11 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                       </div>
                       
                       <div className="flex flex-col space-y-2 ml-4">
-                        <Button size="sm" data-testid="detailed-button-rsvp">
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleRsvpEvent(selectedPost)}
+                          data-testid="detailed-button-rsvp"
+                        >
                           <Calendar className="w-4 h-4 mr-2" />
                           RSVP
                         </Button>
@@ -855,6 +933,7 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => handleLikeReply(selectedPost.id, reply.id)}
                               className={`text-xs ${reply.liked ? 'text-red-500' : ''}`}
                               data-testid={`detailed-button-like-reply-${reply.id}`}
                             >

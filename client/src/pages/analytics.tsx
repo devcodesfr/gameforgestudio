@@ -21,6 +21,7 @@ import {
   Zap
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 
 interface AnalyticsPageProps {
   sidebarCollapsed?: boolean;
@@ -346,7 +347,12 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                     <BarChart3 className="w-5 h-5" />
                     <span>Daily Active Players</span>
                   </h3>
-                  <div className="h-64 mb-4">
+                  <ChartContainer
+                    config={{
+                      players: { label: "Active Players", color: "hsl(217, 91%, 60%)" }
+                    } satisfies ChartConfig}
+                    className="h-64 mb-4"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={playerData}>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -363,14 +369,14 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                         <Line 
                           type="monotone" 
                           dataKey="players" 
-                          stroke="#3b82f6" 
+                          stroke="hsl(217, 91%, 60%)"
                           strokeWidth={2}
-                          dot={{ fill: '#3b82f6', strokeWidth: 2 }}
-                          activeDot={{ r: 6, fill: '#1d4ed8' }}
+                          dot={{ fill: 'hsl(217, 91%, 60%)', strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: 'hsl(217, 91%, 52%)' }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartContainer>
                 </Card>
 
                 <Card className="p-6">
@@ -409,14 +415,19 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                     <Activity className="w-5 h-5" />
                     <span>System Performance Metrics</span>
                   </h3>
-                  <div className="h-64 mb-4">
+                  <ChartContainer
+                    config={{
+                      value: { label: "Performance", color: "hsl(142, 76%, 36%)" }
+                    } satisfies ChartConfig}
+                    className="h-64 mb-4"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
-                        { name: 'FPS', value: 58.2, fill: '#22c55e' },
-                        { name: 'Memory (GB)', value: 2.1, fill: '#eab308' },
-                        { name: 'Load Time (s)', value: 4.2, fill: '#3b82f6' },
-                        { name: 'CPU Usage (%)', value: 45.3, fill: '#f97316' },
-                        { name: 'GPU Usage (%)', value: 72.8, fill: '#8b5cf6' }
+                        { name: 'FPS', value: 58.2, fill: 'hsl(142, 76%, 36%)' },
+                        { name: 'Memory (GB)', value: 2.1, fill: 'hsl(48, 96%, 53%)' },
+                        { name: 'Load Time (s)', value: 4.2, fill: 'hsl(217, 91%, 60%)' },
+                        { name: 'CPU Usage (%)', value: 45.3, fill: 'hsl(25, 95%, 53%)' },
+                        { name: 'GPU Usage (%)', value: 72.8, fill: 'hsl(258, 90%, 66%)' }
                       ]}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" fontSize={12} />
@@ -425,7 +436,7 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                         <Bar dataKey="value" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartContainer>
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -530,7 +541,12 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                     <TrendingUp className="w-5 h-5" />
                     <span>Revenue Trends</span>
                   </h3>
-                  <div className="h-64 mb-4">
+                  <ChartContainer
+                    config={{
+                      revenue: { label: "Revenue", color: "hsl(142, 76%, 36%)" }
+                    } satisfies ChartConfig}
+                    className="h-64 mb-4"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={playerData}>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -547,14 +563,14 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                         <Area 
                           type="monotone" 
                           dataKey="revenue" 
-                          stroke="#22c55e" 
-                          fill="#22c55e" 
+                          stroke="hsl(142, 76%, 36%)" 
+                          fill="hsl(142, 76%, 36%)" 
                           fillOpacity={0.2}
                           strokeWidth={2}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartContainer>
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -563,7 +579,12 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                       <DollarSign className="w-5 h-5" />
                       <span>Revenue Breakdown</span>
                     </h3>
-                    <div className="h-48 mb-4">
+                    <ChartContainer
+                      config={{
+                        value: { label: "Revenue", color: "hsl(217, 91%, 60%)" }
+                      } satisfies ChartConfig}
+                      className="h-48 mb-4"
+                    >
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Tooltip formatter={(value) => [`${formatCurrency(Number(value))}`, 'Revenue']} />
@@ -578,13 +599,13 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                             cy="50%" 
                             outerRadius={60}
                           >
-                            <Cell fill="#3b82f6" />
-                            <Cell fill="#22c55e" />
-                            <Cell fill="#f59e0b" />
+                            <Cell fill="hsl(217, 91%, 60%)" />
+                            <Cell fill="hsl(142, 76%, 36%)" />
+                            <Cell fill="hsl(38, 92%, 50%)" />
                           </Pie>
                         </PieChart>
                       </ResponsiveContainer>
-                    </div>
+                    </ChartContainer>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
@@ -647,14 +668,19 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                     <Target className="w-5 h-5" />
                     <span>Feature Engagement Overview</span>
                   </h3>
-                  <div className="h-64 mb-4">
+                  <ChartContainer
+                    config={{
+                      engagement: { label: "Engagement", color: "hsl(142, 76%, 36%)" }
+                    } satisfies ChartConfig}
+                    className="h-64 mb-4"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={[
-                          { name: 'Main Game', engagement: 92, fill: '#22c55e' },
-                          { name: 'Social Features', engagement: 67, fill: '#3b82f6' },
-                          { name: 'Shop/Store', engagement: 45, fill: '#f59e0b' },
-                          { name: 'Settings', engagement: 23, fill: '#6b7280' }
+                          { name: 'Main Game', engagement: 92, fill: 'hsl(142, 76%, 36%)' },
+                          { name: 'Social Features', engagement: 67, fill: 'hsl(217, 91%, 60%)' },
+                          { name: 'Shop/Store', engagement: 45, fill: 'hsl(38, 92%, 50%)' },
+                          { name: 'Settings', engagement: 23, fill: 'hsl(215, 16%, 47%)' }
                         ]} 
                         layout="horizontal"
                         margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -681,14 +707,14 @@ export default function AnalyticsPage({ sidebarCollapsed = false }: AnalyticsPag
                           dataKey="engagement" 
                           radius={[0, 4, 4, 0]}
                         >
-                          <Cell fill="#22c55e" />
-                          <Cell fill="#3b82f6" />
-                          <Cell fill="#f59e0b" />
-                          <Cell fill="#6b7280" />
+                          <Cell fill="hsl(142, 76%, 36%)" />
+                          <Cell fill="hsl(217, 91%, 60%)" />
+                          <Cell fill="hsl(38, 92%, 50%)" />
+                          <Cell fill="hsl(215, 16%, 47%)" />
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartContainer>
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

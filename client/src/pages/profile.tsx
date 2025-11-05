@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
+import devinProfileImage from "@assets/20250726_182919_1758161967360.jpg";
 
 const DEFAULT_BANNERS = [
   "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&h=400&fit=crop",
@@ -132,6 +133,10 @@ export default function ProfilePage({ sidebarCollapsed = false }: ProfilePagePro
     );
   }
 
+  // Use fallback avatar and banner if user's are empty/null
+  const displayAvatar = formData.avatar || devinProfileImage;
+  const displayBanner = formData.banner || DEFAULT_BANNERS[0];
+
   return (
     <div className="min-h-screen bg-background animate-fade-in">
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
@@ -141,13 +146,11 @@ export default function ProfilePage({ sidebarCollapsed = false }: ProfilePagePro
           className="relative h-48 sm:h-56 md:h-64 lg:h-72 bg-gradient-to-br from-primary/20 to-primary/5 rounded-b-3xl overflow-hidden"
           data-testid="section-profile-banner"
         >
-          {formData.banner && (
-            <img
-              src={formData.banner}
-              alt="Profile banner"
-              className="w-full h-full object-cover"
-            />
-          )}
+          <img
+            src={displayBanner}
+            alt="Profile banner"
+            className="w-full h-full object-cover"
+          />
           {isEditing && (
             <button
               className="absolute top-4 left-4 bg-background/90 hover:bg-background p-3 rounded-xl transition-colors"
@@ -169,7 +172,7 @@ export default function ProfilePage({ sidebarCollapsed = false }: ProfilePagePro
               }}
               data-testid="img-profile-avatar"
             >
-              <AvatarImage src={formData.avatar || undefined} />
+              <AvatarImage src={displayAvatar} />
               <AvatarFallback className="text-4xl bg-primary/10 text-primary">
                 {user.displayName.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
