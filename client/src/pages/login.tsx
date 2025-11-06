@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Gamepad2, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import gameforgeIcon from "@assets/[passion project] gameforge icon_1762387491334.png";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -51,9 +52,11 @@ export default function LoginPage() {
         {/* Logo and Title */}
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <Gamepad2 className="w-10 h-10 text-primary" />
-            </div>
+            <img 
+              src={gameforgeIcon} 
+              alt="GameForge Logo" 
+              className="w-20 h-20 rounded-2xl"
+            />
           </div>
           <h1 className="text-3xl font-bold text-foreground">GameForge</h1>
           <p className="text-muted-foreground">Sign in to your account</p>

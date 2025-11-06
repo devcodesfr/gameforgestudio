@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Gamepad2, Menu, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import { Menu, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { NAVIGATION_ITEMS } from "@/lib/constants";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import devinProfileImage from "@assets/20250726_182919_1758161967360.jpg";
+import gameforgeIcon from "@assets/[passion project] gameforge icon_1762387491334.png";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -98,9 +99,12 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <Link href="/dashboard" className="flex-1">
             <div className="flex items-center cursor-pointer space-x-3">
-              <div className="w-10 h-10 flex items-center justify-center" data-testid="logo-icon">
-                <Gamepad2 className="w-6 h-6 text-purple-400" />
-              </div>
+              <img 
+                src={gameforgeIcon} 
+                alt="GameForge Logo" 
+                className="w-10 h-10 rounded-lg" 
+                data-testid="logo-icon"
+              />
               <div>
                 <h1 className="text-xl font-bold text-foreground" data-testid="text-app-name">GameForge</h1>
                 <p className="text-sm text-muted-foreground" data-testid="text-app-subtitle">Studio Platform</p>

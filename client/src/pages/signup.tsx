@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Gamepad2, UserPlus, Code, GamepadIcon } from "lucide-react";
+import { UserPlus, Code, GamepadIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import gameforgeIcon from "@assets/[passion project] gameforge icon_1762387491334.png";
 
 type UserRole = "developer" | "regular";
 
@@ -96,9 +97,11 @@ export default function SignupPage() {
         <Card className="w-full max-w-4xl p-8 space-y-6">
           <div className="text-center space-y-2">
             <div className="flex justify-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center">
-                <Gamepad2 className="w-10 h-10 text-primary" />
-              </div>
+              <img 
+                src={gameforgeIcon} 
+                alt="GameForge Logo" 
+                className="w-20 h-20 rounded-2xl"
+              />
             </div>
             <h1 className="text-3xl font-bold text-foreground">Welcome to GameForge</h1>
             <p className="text-muted-foreground">Choose your account type to get started</p>
