@@ -4,6 +4,10 @@ modules = ["nodejs-20", "postgresql-16"]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 38157
+externalPort = 3000
+
 [agent]
 integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_mem_db:1.0.0"]
 
