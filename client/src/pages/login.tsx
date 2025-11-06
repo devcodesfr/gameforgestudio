@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import gameforgeIcon from "@assets/[passion project] gameforge icon (transparent background)_1762389151619.png";
+import gameforgeIcon from "@assets/image_1762389418995.png";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();

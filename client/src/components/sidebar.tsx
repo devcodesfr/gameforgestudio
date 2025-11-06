@@ -4,7 +4,7 @@ import { Menu, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { NAVIGATION_ITEMS } from "@/lib/constants";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import devinProfileImage from "@assets/20250726_182919_1758161967360.jpg";
-import gameforgeIcon from "@assets/[passion project] gameforge icon (transparent background)_1762389151619.png";
+import gameforgeIcon from "@assets/image_1762389418995.png";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
