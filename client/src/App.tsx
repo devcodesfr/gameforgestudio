@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +7,7 @@ import { Router, Route, useLocation } from "wouter";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiRequest } from "@/lib/queryClient";
 import { Sidebar } from "@/components/sidebar";
+import { ErrorBoundary } from "@/components/error-boundary";
 import Dashboard from "@/pages/dashboard";
 import ProjectsPage from "@/pages/projects";
 import AssetStorePage from "@/pages/asset-store";
@@ -52,39 +53,66 @@ const PlaceholderSection = ({ title, description, sidebarCollapsed }: { title: s
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Router>
-          <div className="min-h-screen bg-background text-foreground">
-            <AppWithSidebar />
-          </div>
-        </Router>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Router>
+            <div className="min-h-screen bg-background text-foreground">
+              <ErrorBoundary>
+                <AppWithSidebar />
+              </ErrorBoundary>
+            </div>
+          </Router>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
 function AppWithSidebar() {
   const [location, setLocation] = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const redirectAttemptRef = useRef(0);
+  const lastLocationRef = useRef(location);
   
   const userQuery = useCurrentUser();
   
-  // Apply theme based on user role
+  // Apply theme based on user role with error handling
   useEffect(() => {
-    if (userQuery.data?.role === 'regular') {
-      document.documentElement.classList.add('regular-user-theme');
-    } else {
-      document.documentElement.classList.remove('regular-user-theme');
+    try {
+      if (userQuery.data?.role === 'regular') {
+        document.documentElement.classList.add('regular-user-theme');
+      } else {
+        document.documentElement.classList.remove('regular-user-theme');
+      }
+    } catch (error) {
+      console.error('Error applying theme:', error);
     }
   }, [userQuery.data?.role]);
   
-  // Redirect unauthenticated users to login (except on login/signup pages)
+  // Redirect unauthenticated users to login with loop prevention
   useEffect(() => {
-    if (userQuery.isError && location !== '/login' && location !== '/signup') {
-      console.debug('User not authenticated, redirecting to login');
-      setLocation('/login');
+    try {
+      // Reset redirect counter if location changed successfully
+      if (lastLocationRef.current !== location) {
+        redirectAttemptRef.current = 0;
+        lastLocationRef.current = location;
+      }
+      
+      // Prevent infinite redirect loops
+      if (redirectAttemptRef.current > 5) {
+        console.error('Too many redirect attempts, stopping to prevent loop');
+        return;
+      }
+      
+      if (userQuery.isError && location !== '/login' && location !== '/signup') {
+        console.debug('User not authenticated, redirecting to login');
+        redirectAttemptRef.current += 1;
+        setLocation('/login');
+      }
+    } catch (error) {
+      console.error('Error in authentication redirect:', error);
     }
   }, [userQuery.isError, location, setLocation]);
   
