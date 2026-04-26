@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { UserPlus, Code, GamepadIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import gameforgeIcon from "@assets/image_1762389418995.png";
 
 type UserRole = "developer" | "regular";
@@ -71,6 +71,7 @@ export default function SignupPage() {
       }
 
       await apiRequest("POST", "/api/auth/signup", signupData);
+      queryClient.removeQueries({ queryKey: ["/api/user/current"] });
 
       toast({
         title: "Account created!",

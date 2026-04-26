@@ -3,8 +3,8 @@ import { Link, useLocation } from "wouter";
 import { Menu, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { NAVIGATION_ITEMS } from "@/lib/constants";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import devinProfileImage from "@assets/20250726_182919_1758161967360.jpg";
 import gameforgeIcon from "@assets/image_1762389418995.png";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -33,15 +33,15 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
   
   // Get real authenticated user data
   const userQuery = useCurrentUser();
-  const user = userQuery.data || {
-    displayName: "Devin Gamble",
-    role: "Lead Developer",
-    jobTitle: "Lead Developer",
-    avatar: devinProfileImage
-  };
-
-  // Use fallback avatar if user's avatar is empty/null
-  const displayAvatar = user.avatar || devinProfileImage;
+  const user = userQuery.data;
+  const displayName = user?.displayName || "User";
+  const displayRole = user?.jobTitle || user?.role;
+  const fallbackInitials = displayName
+    .split(" ")
+    .map((name) => name[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleLogout = async () => {
     try {
@@ -118,7 +118,7 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
       <nav className="flex-1 p-4 sidebar-scrollbar overflow-y-auto">
         <ul className="space-y-2">
           {NAVIGATION_ITEMS
-            .filter(item => !item.roles || item.roles.includes((userQuery.data?.role || 'developer') as 'developer' | 'regular'))
+            .filter(item => !item.roles || item.roles.includes((user?.role || 'developer') as 'developer' | 'regular'))
             .map((item) => (
             <li key={item.id}>
               <Tooltip>
@@ -161,22 +161,25 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
             }
           }}
           data-testid="button-profile-trigger"
-          title={collapsed ? (user.displayName ?? undefined) : undefined}
+          title={collapsed ? displayName : undefined}
         >
-          <img 
-            src={displayAvatar} 
-            alt={user.displayName || "User Avatar"} 
-            className={`rounded-full border-2 border-border flex-shrink-0 ${
+          <Avatar
+            className={`border-2 border-border flex-shrink-0 ${
               collapsed ? 'w-8 h-8' : 'w-10 h-10'
             }`}
             data-testid="img-profile-avatar"
-          />
+          >
+            <AvatarImage src={user?.avatar || undefined} alt={displayName} className="object-cover" />
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              {fallbackInitials}
+            </AvatarFallback>
+          </Avatar>
           {!collapsed && (
             <div className="flex-1 text-left">
-              <div className="font-medium text-foreground" data-testid="text-user-name">{user.displayName}</div>
+              <div className="font-medium text-foreground" data-testid="text-user-name">{displayName}</div>
               {/* Only show role for developers */}
-              {user.role !== "regular" && (
-                <div className="text-sm text-muted-foreground" data-testid="text-user-role">{user.jobTitle || user.role}</div>
+              {user && user.role !== "regular" && displayRole && (
+                <div className="text-sm text-muted-foreground" data-testid="text-user-role">{displayRole}</div>
               )}
             </div>
           )}

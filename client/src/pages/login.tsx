@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import gameforgeIcon from "@assets/image_1762389418995.png";
 
 export default function LoginPage() {
@@ -23,7 +23,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response: any = await apiRequest("POST", "/api/auth/login", formData);
+      const response = await apiRequest("POST", "/api/auth/login", formData);
+      const loginData = await response.json();
+      queryClient.removeQueries({ queryKey: ["/api/user/current"] });
       
       toast({
         title: "Welcome back!",
@@ -31,7 +33,7 @@ export default function LoginPage() {
       });
 
       // Redirect based on user role
-      const redirectPath = response.user?.role === "regular" ? "/store" : "/dashboard";
+      const redirectPath = loginData.user?.role === "regular" ? "/store" : "/dashboard";
       setLocation(redirectPath);
       // Reload to fetch user data
       window.location.reload();

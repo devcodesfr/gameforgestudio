@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
-import devinProfileImage from "@assets/20250726_182919_1758161967360.jpg";
 
 const DEFAULT_BANNERS = [
   "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&h=400&fit=crop",
@@ -133,8 +132,7 @@ export default function ProfilePage({ sidebarCollapsed = false }: ProfilePagePro
     );
   }
 
-  // Use fallback avatar and banner if user's are empty/null
-  const displayAvatar = formData.avatar || devinProfileImage;
+  // Use fallback banner if user's is empty/null
   const displayBanner = formData.banner || DEFAULT_BANNERS[0];
 
   return (
@@ -172,7 +170,7 @@ export default function ProfilePage({ sidebarCollapsed = false }: ProfilePagePro
               }}
               data-testid="img-profile-avatar"
             >
-              <AvatarImage src={displayAvatar} />
+              <AvatarImage src={formData.avatar || undefined} />
               <AvatarFallback className="text-4xl bg-primary/10 text-primary">
                 {user.displayName.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
