@@ -70,16 +70,20 @@ export default function SignupPage() {
         signupData.portfolioLink = formData.portfolioLink;
       }
 
-      await apiRequest("POST", "/api/auth/signup", signupData);
+      const response = await apiRequest("POST", "/api/auth/signup", signupData);
+      const createdAccount = await response.json();
       queryClient.removeQueries({ queryKey: ["/api/user/current"] });
 
       toast({
         title: "Account created!",
-        description: "Welcome to GameForge",
+        description: "You're signed in and ready to go.",
       });
 
-      // Redirect to login
-      setLocation("/login");
+      // Redirect based on user role
+      const redirectPath = createdAccount.user?.role === "regular" ? "/store" : "/dashboard";
+      setLocation(redirectPath);
+      // Reload to fetch user data
+      window.location.reload();
     } catch (error: any) {
       toast({
         title: "Signup failed",
