@@ -42,7 +42,8 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const buttonzUrl = import.meta.env.VITE_BUTTONZ_URL || "http://localhost:5001";
+  const buttonzUrl = import.meta.env.VITE_BUTTONZ_URL || "http://localhost:5175";
+  const buttonzLaunchUrl = `${buttonzUrl}${buttonzUrl.includes("?") ? "&" : "?"}from=gfs`;
 
   const handleLogout = async () => {
     try {
@@ -64,7 +65,7 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
   };
 
   const openExternalProduct = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.location.href = url;
   };
 
   // Map navigation IDs to routes
@@ -131,11 +132,11 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
                     <div
                       role="button"
                       tabIndex={0}
-                      onClick={() => openExternalProduct(buttonzUrl)}
+                      onClick={() => openExternalProduct(buttonzLaunchUrl)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          openExternalProduct(buttonzUrl);
+                          openExternalProduct(buttonzLaunchUrl);
                         }
                       }}
                       className={`nav-item w-full flex items-center rounded-lg transition-all duration-200 cursor-pointer ${
