@@ -72,6 +72,7 @@ export function Sidebar({ activeSection, collapsed, onToggle }: SidebarProps) {
   const getRouteForSection = (sectionId: string) => {
     switch (sectionId) {
       case 'dashboard': return '/dashboard';
+      case 'home': return '/home';
       case 'projects': return '/projects';
       case 'game-engines': return '/game-engines';
       case 'asset-store': return '/asset-store';

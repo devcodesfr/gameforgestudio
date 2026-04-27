@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Hash, Users, Plus, Settings, Smile, Paperclip, Send, Mail, Phone, Calendar, Edit2, UserCheck, ArrowLeft, Home, X, Sparkles, MessageCircle, Activity, TrendingUp, DoorOpen, Save } from "lucide-react";
+import { Hash, Users, Plus, Settings, Smile, Paperclip, Send, Mail, Phone, Calendar, Edit2, UserCheck, ArrowLeft, Home, X, Sparkles, Activity, TrendingUp, DoorOpen, Save } from "lucide-react";
+import { ButtonzSidebarIcon } from "@/components/icons/buttonz-sidebar-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -190,7 +191,7 @@ function SplashScreen({ type }: { type: 'entry' | 'exit' }) {
       <div className="text-center space-y-6 animate-fade-in">
         <div className="w-32 h-32 bg-gradient-to-br from-primary to-primary/70 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-primary/50 animate-pulse">
           {type === 'entry' ? (
-            <MessageCircle className="w-16 h-16 text-white" />
+            <ButtonzSidebarIcon className="w-16 h-16 text-white" />
           ) : (
             <DoorOpen className="w-16 h-16 text-white" />
           )}
@@ -224,7 +225,7 @@ function ChatSidebar({ chats, activeChat, onChatSelect, standalone = false, onEx
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
-              <MessageCircle className="w-5 h-5 text-white" />
+              <ButtonzSidebarIcon className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -394,7 +395,7 @@ function ChatArea({ chat, messages, users, onSendMessage, currentUser }: {
       <div className="flex-1 flex items-center justify-center bg-background animate-fade-in">
         <div className="text-center p-8 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 max-w-md">
           <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MessageCircle className="w-10 h-10 text-primary" />
+            <ButtonzSidebarIcon className="w-10 h-10 text-primary" />
           </div>
           <h3 className="text-xl font-bold text-foreground mb-2">Start a Conversation</h3>
           <p className="text-muted-foreground mb-4">Select a channel from the sidebar to begin chatting with your team</p>

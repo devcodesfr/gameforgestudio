@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - Radix UI primitives providing accessible, unstyled components as building blocks
 - shadcn/ui components built on top of Radix for consistent, customizable UI elements
 - Custom design system following modern developer tool aesthetics (inspired by VS Code, Linear, GitHub)
-- Dual theme support: darker theme with vibrant purple for developers, lighter theme for regular users
+- Dual theme support: darker theme with vibrant purple for developers, lighter theme for gamers
 - Typography: Inter font family for UI, JetBrains Mono for code display
 
 **State Management:**
@@ -96,7 +96,7 @@ Preferred communication style: Simple, everyday language.
 **Authorization:**
 - Role-based access control with two primary roles: `developer` and `regular`
 - Developers get access to project management, game engines, asset store, distribution, and analytics
-- Regular users get a consumer-focused experience with store, library, and community features
+- Gamers get a consumer-focused experience with store, library, and community features
 - Navigation items filtered by user role
 - Theme dynamically applied based on user role (developer = dark purple, regular = lighter)
 

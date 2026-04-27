@@ -1,17 +1,22 @@
-import { Home, FolderOpen, Settings, Store, Users, CloudUpload, BarChart3, MessageCircle, Calendar, Library as LibraryIcon, LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { Home, FolderOpen, Settings, Store, Users, CloudUpload, BarChart3, Calendar, Library as LibraryIcon } from 'lucide-react';
+import { ButtonzSidebarIcon } from '@/components/icons/buttonz-sidebar-icon';
 
-export const NAVIGATION_ITEMS: Array<{ id: string; icon: LucideIcon; label: string; roles?: ('developer' | 'regular')[]; external?: boolean }> = [
+type NavigationIcon = ComponentType<{ className?: string }>;
+
+export const NAVIGATION_ITEMS: Array<{ id: string; icon: NavigationIcon; label: string; roles?: ('developer' | 'regular')[]; external?: boolean }> = [
   { id: 'dashboard', icon: Home, label: 'Dashboard', roles: ['developer'] },
+  { id: 'home', icon: Home, label: 'Home', roles: ['regular'] },
+  { id: 'library', icon: LibraryIcon, label: 'Library', roles: ['regular'] },
   { id: 'store', icon: Store, label: 'Store', roles: ['regular'] },
   { id: 'projects', icon: FolderOpen, label: 'Projects', roles: ['developer'] },
   { id: 'game-engines', icon: Settings, label: 'Game Engines', roles: ['developer'] },
   { id: 'asset-store', icon: Store, label: 'Asset Store', roles: ['developer'] },
-  { id: 'collaboration', icon: MessageCircle, label: 'Buttonz', external: true },
+  { id: 'collaboration', icon: ButtonzSidebarIcon, label: 'Buttonz', external: true },
   { id: 'distribution', icon: CloudUpload, label: 'Distribution', roles: ['developer'] },
   { id: 'analytics', icon: BarChart3, label: 'Analytics', roles: ['developer'] },
   { id: 'community', icon: Users, label: 'Community' },
   { id: 'calendar', icon: Calendar, label: 'Calendar' },
-  { id: 'library', icon: LibraryIcon, label: 'Library', roles: ['regular'] },
 ];
 
 export const PROJECT_STATUS_CONFIG = {

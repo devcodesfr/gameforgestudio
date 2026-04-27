@@ -24,6 +24,7 @@ import ProfilePage from "@/pages/profile";
 import SettingsPage from "@/pages/settings";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
+import GamerHomePage from "@/pages/gamer-home";
 import LibraryPage from "@/pages/library";
 import StorePage from "@/pages/store";
 import GameDetailPage from "@/pages/game-detail";
@@ -54,6 +55,7 @@ const PlaceholderSection = ({ title, description, sidebarCollapsed }: { title: s
 function getDocumentTitle(path: string) {
   if (path === "/login") return "GFS Login";
   if (path === "/signup") return "GFS Signup";
+  if (path === "/home") return "Home";
   if (path === "/" || path === "/dashboard") return "Dashboard";
   if (path.startsWith("/projects")) return "Projects";
   if (path.startsWith("/game-engines")) return "Game Engines";
@@ -110,8 +112,13 @@ function AppWithSidebar() {
   const userQuery = useCurrentUser();
 
   useEffect(() => {
+    if (location === "/" && userQuery.data?.role === "regular") {
+      document.title = "Home";
+      return;
+    }
+
     document.title = getDocumentTitle(location);
-  }, [location]);
+  }, [location, userQuery.data?.role]);
   
   // Apply theme based on user role with error handling
   useEffect(() => {
@@ -178,7 +185,9 @@ function AppWithSidebar() {
   
   // Map routes to sections for sidebar highlighting
   const getActiveSection = (path: string) => {
-    if (path === "/" || path === "/dashboard") return "dashboard";
+    if (path === "/") return userQuery.data?.role === "regular" ? "home" : "dashboard";
+    if (path === "/home") return "home";
+    if (path === "/dashboard") return "dashboard";
     if (path.startsWith("/projects")) return "projects";
     if (path.startsWith("/game-engines")) return "game-engines";
     if (path.startsWith("/asset-store")) return "asset-store";
@@ -202,10 +211,17 @@ function AppWithSidebar() {
     <>
       <Sidebar activeSection={activeSection} collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <Route path="/">
-        <Dashboard sidebarCollapsed={sidebarCollapsed} />
+        {userQuery.data?.role === "regular" ? (
+          <GamerHomePage sidebarCollapsed={sidebarCollapsed} />
+        ) : (
+          <Dashboard sidebarCollapsed={sidebarCollapsed} />
+        )}
       </Route>
       <Route path="/dashboard">
         <Dashboard sidebarCollapsed={sidebarCollapsed} />
+      </Route>
+      <Route path="/home">
+        <GamerHomePage sidebarCollapsed={sidebarCollapsed} />
       </Route>
       <Route path="/projects">
         <ProjectsPage sidebarCollapsed={sidebarCollapsed} />

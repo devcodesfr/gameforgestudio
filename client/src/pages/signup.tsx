@@ -80,7 +80,7 @@ export default function SignupPage() {
       });
 
       // Redirect based on user role
-      const redirectPath = createdAccount.user?.role === "regular" ? "/store" : "/dashboard";
+      const redirectPath = createdAccount.user?.role === "regular" ? "/home" : "/dashboard";
       setLocation(redirectPath);
       // Reload to fetch user data
       window.location.reload();
@@ -151,7 +151,7 @@ export default function SignupPage() {
               </div>
             </button>
 
-            {/* Regular User Card */}
+            {/* Gamer Card */}
             <button
               onClick={() => handleRoleSelection("regular")}
               className="group relative overflow-hidden rounded-2xl border-2 border-border hover:border-primary transition-all duration-300 bg-card p-6 text-left"
@@ -163,7 +163,7 @@ export default function SignupPage() {
                   <GamepadIcon className="w-8 h-8 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">Regular User</h3>
+                  <h3 className="text-xl font-bold text-foreground mb-2">Gamer</h3>
                   <p className="text-sm text-muted-foreground">
                     Perfect for gamers who want to explore, play, and connect with the gaming community
                   </p>

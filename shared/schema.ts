@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   email: text("email").notNull().unique(),
   displayName: text("display_name").notNull(),
-  role: text("role").notNull().default("developer"), // developer or regular
+  role: text("role").notNull().default("developer"), // developer or gamer (stored as regular)
   avatar: text("avatar"),
   banner: text("banner"),
   // Profile fields for Buttonz user management
@@ -63,7 +63,7 @@ export const metrics = pgTable("metrics", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Game Library for Regular Users
+// Game Library for Gamers
 export const gameLibrary = pgTable("game_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),

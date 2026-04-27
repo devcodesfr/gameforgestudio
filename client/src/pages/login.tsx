@@ -33,7 +33,7 @@ export default function LoginPage() {
       });
 
       // Redirect based on user role
-      const redirectPath = loginData.user?.role === "regular" ? "/store" : "/dashboard";
+      const redirectPath = loginData.user?.role === "regular" ? "/home" : "/dashboard";
       setLocation(redirectPath);
       // Reload to fetch user data
       window.location.reload();
