@@ -24,3 +24,6 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Local persistence (shared community feed; dev machine only)
+data/community-posts.json

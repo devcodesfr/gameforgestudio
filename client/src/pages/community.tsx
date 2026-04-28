@@ -19,8 +19,7 @@ import {
   Send,
   Plus,
   Filter,
-  Sparkles,
-  Reply
+  Sparkles
 } from 'lucide-react';
 import { calendarIntegration } from '@/lib/calendar-integration';
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -28,7 +27,8 @@ import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
-const COMMUNITY_POSTS_STORAGE_KEY = 'gameforge-community-posts';
+/** Legacy key: we no longer mirror the full feed here (quota + server persistence). One-time clear on mount. */
+const LEGACY_COMMUNITY_POSTS_STORAGE_KEY = 'gameforge-community-posts';
 
 interface CommunityPageProps {
   sidebarCollapsed?: boolean;
@@ -164,35 +164,16 @@ function normalizePost(post: CommunityPost): CommunityPost {
   };
 }
 
-function loadCommunityPosts() {
-  const savedPosts = localStorage.getItem(COMMUNITY_POSTS_STORAGE_KEY);
-  if (!savedPosts) {
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H4,H5',location:'client/src/pages/community.tsx:loadCommunityPosts-empty',message:'community posts loaded from mock fallback',data:{postCount:MOCK_POSTS.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    return MOCK_POSTS.map(normalizePost);
-  }
-
-  try {
-    const parsed = JSON.parse(savedPosts) as CommunityPost[];
-    const normalizedPosts = parsed.map(normalizePost);
-    const newestPost = normalizedPosts[0];
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H4,H5',location:'client/src/pages/community.tsx:loadCommunityPosts-saved',message:'community posts loaded from storage',data:{postCount:normalizedPosts.length,storageLength:savedPosts.length,newestPostId:newestPost?.id || null,newestAvatarShape:newestPost?.author.avatar ? {length:newestPost.author.avatar.length,isUrl:newestPost.author.avatar.startsWith('http'),prefix:newestPost.author.avatar.slice(0,8)} : null,newestRepliesCount:newestPost?.replies.length || 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    return normalizedPosts;
-  } catch (error) {
-    console.warn('Failed to parse saved posts, using default data');
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H5',location:'client/src/pages/community.tsx:loadCommunityPosts-error',message:'community storage parse failed',data:{errorName:error instanceof Error ? error.name : typeof error,errorMessage:error instanceof Error ? error.message : String(error),storageLength:savedPosts.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    return MOCK_POSTS.map(normalizePost);
-  }
-}
-
 function mergeCommunityPosts(primaryPosts: CommunityPost[], secondaryPosts: CommunityPost[]) {
+  const primaryIds = new Set(primaryPosts.map((post) => post.id));
+  /** Avoid replying to phantom `post-…` copies that no longer exist on the server response. */
+  const filteredSecondary = secondaryPosts.filter((post) => {
+    if (!post.id.startsWith('post-')) return true;
+    return primaryIds.has(post.id);
+  });
+
   const merged = new Map<string, CommunityPost>();
-  [...primaryPosts, ...secondaryPosts].forEach((post) => {
+  [...filteredSecondary, ...primaryPosts].forEach((post) => {
     merged.set(post.id, normalizePost(post));
   });
 
@@ -256,8 +237,8 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
   const { toast } = useToast();
   const currentUser = userQuery.data;
 
-  // Initialize posts from localStorage or fallback to MOCK_POSTS
-  const [posts, setPosts] = useState<CommunityPost[]>(loadCommunityPosts);
+  /** In-memory + `/api/community/posts` only; do not persist full feed to localStorage (browser quota). */
+  const [posts, setPosts] = useState<CommunityPost[]>(() => MOCK_POSTS.map(normalizePost));
   const { data: sharedPosts = [] } = useQuery<CommunityPost[]>({
     queryKey: ['/api/community/posts'],
     refetchInterval: 3000,
@@ -269,6 +250,10 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
   const [replyContent, setReplyContent] = useState('');
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
 
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [selectedPost?.id]);
+
   // Event creation state
   const [eventTitle, setEventTitle] = useState('');
   const [eventDescription, setEventDescription] = useState('');
@@ -276,51 +261,18 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
   const [eventDate, setEventDate] = useState('');
   const [eventLocation, setEventLocation] = useState('');
 
-  // Save posts to localStorage whenever posts change
   useEffect(() => {
-    localStorage.setItem(COMMUNITY_POSTS_STORAGE_KEY, JSON.stringify(posts));
-    const newestPost = posts[0];
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H3,H5',location:'client/src/pages/community.tsx:save-posts-effect',message:'community posts saved to storage',data:{postCount:posts.length,newestPostId:newestPost?.id || null,newestAuthorRole:newestPost?.author.role || null,newestAvatarShape:newestPost?.author.avatar ? {length:newestPost.author.avatar.length,isUrl:newestPost.author.avatar.startsWith('http'),prefix:newestPost.author.avatar.slice(0,8)} : null,newestContentLength:newestPost?.content.length || 0,newestRepliesCount:newestPost?.replies.length || 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [posts]);
-
-  useEffect(() => {
-    if (sharedPosts.length === 0) return;
-
-    const normalizedSharedPosts = sharedPosts.map(normalizePost);
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H11,H13',location:'client/src/pages/community.tsx:shared-posts-like-state',message:'shared community posts like state received',data:{sharedCount:normalizedSharedPosts.length,newestSharedPostId:normalizedSharedPosts[0]?.id || null,newestLikesCount:normalizedSharedPosts[0]?.likesCount ?? null,newestLiked:normalizedSharedPosts[0]?.liked ?? null,topPosts:normalizedSharedPosts.slice(0,3).map((post) => ({id:post.id,likesCount:post.likesCount,liked:post.liked}))},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    setPosts((currentPosts) => mergeCommunityPosts(normalizedSharedPosts, currentPosts));
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-post-fix',hypothesisId:'H3,H4',location:'client/src/pages/community.tsx:shared-posts-merge',message:'shared community posts merged from api',data:{sharedCount:normalizedSharedPosts.length,newestSharedPostId:normalizedSharedPosts[0]?.id || null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [sharedPosts]);
-
-  useEffect(() => {
-    const syncCommunityPosts = (source: string) => {
-      const syncedPosts = loadCommunityPosts();
-      // #region agent log
-      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H3,H4',location:'client/src/pages/community.tsx:syncCommunityPosts',message:'community posts sync requested',data:{source,syncedCount:syncedPosts.length,newestPostId:syncedPosts[0]?.id || null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      setPosts((currentPosts) => mergeCommunityPosts(syncedPosts, currentPosts));
-    };
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === COMMUNITY_POSTS_STORAGE_KEY) {
-        syncCommunityPosts('storage');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    const handleFocus = () => syncCommunityPosts('focus');
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
-    };
+    try {
+      localStorage.removeItem(LEGACY_COMMUNITY_POSTS_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  useEffect(() => {
+    const normalizedSharedPosts = sharedPosts.map(normalizePost);
+    setPosts((currentPosts) => mergeCommunityPosts(normalizedSharedPosts, currentPosts));
+  }, [sharedPosts]);
 
   useEffect(() => {
     if (!selectedPost) return;
@@ -339,21 +291,6 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
     return true;
   });
 
-  useEffect(() => {
-    const newestPost = filteredPosts[0];
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H1,H2,H4',location:'client/src/pages/community.tsx:filtered-posts-render',message:'community filtered posts rendered',data:{filter,visibleCount:filteredPosts.length,newestPostId:newestPost?.id || null,newestAuthorRole:newestPost?.author.role || null,newestAvatarShape:newestPost?.author.avatar ? {length:newestPost.author.avatar.length,isUrl:newestPost.author.avatar.startsWith('http'),prefix:newestPost.author.avatar.slice(0,8)} : null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [filter, posts]);
-
-  useEffect(() => {
-    const bodyText = document.body.innerText || '';
-    const dataImageIndex = bodyText.indexOf('data:image');
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-dom-check',hypothesisId:'H6,H7,H8',location:'client/src/pages/community.tsx:visible-dom-scan',message:'community visible text scanned for data image string',data:{hasVisibleDataImage:dataImageIndex >= 0,visibleTextLength:bodyText.length,visibleDataImageSnippet:dataImageIndex >= 0 ? bodyText.slice(dataImageIndex, dataImageIndex + 32) : null,newestPostId:filteredPosts[0]?.id || null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [filteredPosts]);
-
   const applyLocalLike = (postId: string) => {
     setPosts((prev) => prev.map((post) => {
       if (post.id === postId) {
@@ -362,9 +299,6 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
           liked: !post.liked,
           likesCount: post.liked ? post.likesCount - 1 : post.likesCount + 1
         };
-        // #region agent log
-        fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H9,H10,H12,H13',location:'client/src/pages/community.tsx:handleLikePost-local-update',message:'community post like updated local state',data:{postId,beforeLikesCount:post.likesCount,beforeLiked:post.liked,afterLikesCount:updatedPost.likesCount,afterLiked:updatedPost.liked},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         return {
           ...updatedPost
         };
@@ -374,94 +308,129 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
   };
 
   const handleLikePost = async (postId: string) => {
-    const existingPost = posts.find((post) => post.id === postId);
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H9,H10,H12,H13',location:'client/src/pages/community.tsx:handleLikePost-entry',message:'community post like clicked',data:{postId,foundPost:Boolean(existingPost),beforeLikesCount:existingPost?.likesCount ?? null,beforeLiked:existingPost?.liked ?? null,selectedPostId:selectedPost?.id || null,selectedPostLikesCount:selectedPost?.likesCount ?? null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     try {
       const response = await apiRequest('POST', `/api/community/posts/${postId}/like`);
       const updatedPost = normalizePost(await response.json());
       setPosts((prev) => mergeCommunityPosts([updatedPost], prev));
-      // #region agent log
-      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-post-fix',hypothesisId:'H9,H10,H11,H13',location:'client/src/pages/community.tsx:handleLikePost-api-success',message:'community post like updated through shared api',data:{postId:updatedPost.id,likesCount:updatedPost.likesCount,liked:updatedPost.liked},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     } catch (error) {
       // Older local-only posts can still be liked privately until they are recreated through the shared API.
       applyLocalLike(postId);
-      // #region agent log
-      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-post-fix',hypothesisId:'H9,H10,H11,H13',location:'client/src/pages/community.tsx:handleLikePost-api-error',message:'shared like failed, fell back to local like',data:{postId,errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     }
   };
 
-  const handleLikeReply = (postId: string, replyId: string) => {
-    let updatedPost: CommunityPost | null = null;
-
-    setPosts((prev) => prev.map((post) => {
-      if (post.id === postId) {
-        updatedPost = {
-          ...post,
-          replies: post.replies.map((reply) => {
-            if (reply.id === replyId) {
+  const handleLikeReply = async (postId: string, replyId: string) => {
+    try {
+      const response = await apiRequest("POST", `/api/community/posts/${postId}/replies/${replyId}/like`);
+      const updatedPost = normalizePost(await response.json());
+      setPosts((prev) => mergeCommunityPosts([updatedPost], prev));
+      if (selectedPost?.id === postId) {
+        setSelectedPost(updatedPost);
+      }
+    } catch {
+      let updatedPost: CommunityPost | null = null;
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (post.id !== postId) return post;
+          updatedPost = {
+            ...post,
+            replies: post.replies.map((reply) => {
+              if (reply.id !== replyId) return reply;
               return {
                 ...reply,
                 liked: !reply.liked,
-                likesCount: reply.liked ? reply.likesCount - 1 : reply.likesCount + 1
+                likesCount: reply.liked ? reply.likesCount - 1 : reply.likesCount + 1,
               };
-            }
-            return reply;
-          })
-        };
-        return updatedPost;
+            }),
+          };
+          return updatedPost;
+        }),
+      );
+      if (selectedPost?.id === postId && updatedPost) {
+        setSelectedPost(updatedPost);
       }
-      return post;
+    }
+  };
+
+  const applyLocalReply = (postId: string, newReply: CommunityReply) => {
+    let updatedPost: CommunityPost | null = null;
+
+    setPosts((prev) => prev.map((post) => {
+      if (post.id !== postId) return post;
+      const replies = [...post.replies, newReply];
+      updatedPost = {
+        ...post,
+        replies,
+        repliesCount: replies.length,
+      };
+      return updatedPost;
     }));
 
-    // Update selectedPost if this was for the currently selected post
-    if (selectedPost && selectedPost.id === postId && updatedPost) {
+    if (selectedPost?.id === postId && updatedPost) {
       setSelectedPost(updatedPost);
     }
   };
 
-  const handleReply = (postId: string) => {
+  const handleReply = async (postId: string) => {
     if (!currentUser || !replyContent.trim()) return;
 
-    const newReply: CommunityReply = {
+    const text = replyContent.trim();
+    const pendingReply: CommunityReply = {
       id: `reply-${Date.now()}`,
       authorId: currentUser.id,
       author: {
         displayName: currentUser.displayName,
         avatar: currentUser.avatar || undefined,
-        role: currentUser.jobTitle || currentUser.role
+        role: currentUser.jobTitle || currentUser.role,
       },
-      content: replyContent,
+      content: text,
       likesCount: 0,
       createdAt: new Date(),
       liked: false,
     };
 
-    let updatedPost: CommunityPost | null = null;
-
-    setPosts((prev) => prev.map((post) => {
-      if (post.id === postId) {
-        const replies = [...post.replies, newReply];
-        updatedPost = {
-          ...post,
-          replies,
-          repliesCount: replies.length
-        };
-        return updatedPost;
+    try {
+      const response = await apiRequest('POST', `/api/community/posts/${postId}/replies`, {
+        content: text,
+      });
+      const updatedPost = normalizePost(await response.json());
+      setPosts((prev) => mergeCommunityPosts([updatedPost], prev));
+      if (selectedPost?.id === postId) {
+        setSelectedPost(updatedPost);
       }
-      return post;
-    }));
 
-    // Update selectedPost if this reply was for the currently selected post
-    if (selectedPost && selectedPost.id === postId && updatedPost) {
-      setSelectedPost(updatedPost);
+      setReplyContent('');
+      setReplyingTo(null);
+    } catch (err) {
+      applyLocalReply(postId, pendingReply);
+      setReplyContent('');
+      setReplyingTo(null);
+
+      const raw = err instanceof Error ? err.message : String(err);
+      const status = Number(raw.match(/^(\d+):/)?.[1] ?? NaN);
+
+      if (!postId.startsWith('post-')) return;
+
+      if (status === 401) {
+        toast({
+          title: 'Sign in required',
+          description: 'Your session may have expired. Sign in again and try your reply.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (status === 404) {
+        toast({
+          title: 'Post not on shared feed',
+          description: 'Refresh the page — or create a new post — so the server has this thread. Your reply was kept on this device only.',
+        });
+        return;
+      }
+      toast({
+        title: 'Reply failed',
+        description: raw.length < 220 ? raw : 'Could not sync your reply to the shared feed.',
+        variant: 'destructive',
+      });
     }
-
-    setReplyContent('');
-    setReplyingTo(null);
   };
 
     const handleRsvpEvent = (post: CommunityPost) => {
@@ -502,44 +471,32 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
   };
 
   const handleCreatePost = async () => {
-    console.log('handleCreatePost called', { newPostContent: newPostContent.trim(), newPostType, eventTitle });
     if (!currentUser) return;
     if (newPostType === 'event' && !eventTitle) return;
     if (newPostType !== 'event' && !newPostContent.trim()) return;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H1,H2,H5',location:'client/src/pages/community.tsx:handleCreatePost-entry',message:'developer community post create started',data:{userRole:currentUser.role,hasJobTitle:Boolean(currentUser.jobTitle),avatarShape:currentUser.avatar ? {length:currentUser.avatar.length,isUrl:currentUser.avatar.startsWith('http'),prefix:currentUser.avatar.slice(0,8)} : null,postType:newPostType,contentLength:newPostContent.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
-      let newPost: CommunityPost = {
-        id: `post-${Date.now()}`,
-        authorId: currentUser.id,
-        author: {
-          displayName: currentUser.displayName,
-          avatar: currentUser.avatar || undefined,
-          role: currentUser.jobTitle || currentUser.role
-        },
-        content: newPostContent,
-        type: newPostType,
-        likesCount: 0,
-        repliesCount: 0,
-        createdAt: new Date(),
-        liked: false,
-        replies: [] as CommunityReply[],
-      };
-
-    // #region agent log
-    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H1,H2,H5',location:'client/src/pages/community.tsx:handleCreatePost-newPost',message:'community post object created',data:{postId:newPost.id,authorRole:newPost.author.role || null,avatarShape:newPost.author.avatar ? {length:newPost.author.avatar.length,isUrl:newPost.author.avatar.startsWith('http'),prefix:newPost.author.avatar.slice(0,8)} : null,contentLength:newPost.content.length,repliesCount:newPost.replies.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+    let newPost: CommunityPost = {
+      id: `post-${Date.now()}`,
+      authorId: currentUser.id,
+      author: {
+        displayName: currentUser.displayName,
+        avatar: currentUser.avatar || undefined,
+        role: currentUser.jobTitle || currentUser.role
+      },
+      content: newPostContent,
+      type: newPostType,
+      likesCount: 0,
+      repliesCount: 0,
+      createdAt: new Date(),
+      liked: false,
+      replies: [] as CommunityReply[],
+    };
 
     if (newPostType === 'event' && eventTitle) {
-      console.log('Creating event post', { eventTitle, eventType, eventDate, eventLocation });
-      
       // Parse and validate event date
       const parsedDate = eventDate ? new Date(eventDate) : new Date();
       const isValidDate = parsedDate instanceof Date && !isNaN(parsedDate.getTime());
       const eventStartDate = isValidDate ? parsedDate : new Date();
-      console.log('Event date parsing', { eventDate, parsedDate, isValidDate, eventStartDate });
       
       newPost.eventId = `event-${Date.now()}`;
       newPost.event = {
@@ -553,37 +510,36 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
       };
       
       // Auto-add event to Calendar
-        const endDate = new Date(eventStartDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
-        const calendarEvent = {
-          id: newPost.eventId,
-          title: eventTitle,
-          description: newPostContent || eventTitle, // Use title as fallback description
-          type: eventType,
-          startDate: eventStartDate,
-          endDate: endDate,
-          location: eventLocation,
-          createdBy: currentUser.id,
+      const endDate = new Date(eventStartDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
+      const calendarEvent = {
+        id: newPost.eventId,
+        title: eventTitle,
+        description: newPostContent || eventTitle, // Use title as fallback description
+        type: eventType,
+        startDate: eventStartDate,
+        endDate: endDate,
+        location: eventLocation,
+        createdBy: currentUser.id,
         creator: {
           displayName: currentUser.displayName,
           avatar: currentUser.avatar || undefined,
           role: currentUser.jobTitle || currentUser.role
         },
         rsvpCount: 0,
-          maxAttendees: eventType === 'virtual' ? 100 : 30,
-          userRsvp: null,
-          createdAt: new Date()
-        };
-        console.log('Adding event to calendar integration', calendarEvent);
-        calendarIntegration.addEvent(calendarEvent);
+        maxAttendees: eventType === 'virtual' ? 100 : 30,
+        userRsvp: null,
+        createdAt: new Date()
+      };
+      calendarIntegration.addEvent(calendarEvent);
 
-        newPost = {
-          ...newPost,
-          event: {
-            ...newPost.event!,
-            endDate,
-          },
-        };
-      }
+      newPost = {
+        ...newPost,
+        event: {
+          ...newPost.event!,
+          endDate,
+        },
+      };
+    }
 
     try {
       const response = await apiRequest('POST', '/api/community/posts', {
@@ -593,9 +549,6 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
       });
       const sharedPost = normalizePost(await response.json());
       setPosts((prev) => mergeCommunityPosts([sharedPost], prev));
-      // #region agent log
-      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-post-fix',hypothesisId:'H3,H4',location:'client/src/pages/community.tsx:handleCreatePost-api-success',message:'community post created through shared api',data:{postId:sharedPost.id,authorRole:sharedPost.author.role || null,avatarShape:sharedPost.author.avatar ? {length:sharedPost.author.avatar.length,isUrl:sharedPost.author.avatar.startsWith('http'),prefix:sharedPost.author.avatar.slice(0,8)} : null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     } catch (error) {
       toast({
         title: "Post failed",
@@ -890,20 +843,7 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setReplyingTo(post.id);
-                          }}
-                          data-testid={`button-reply-${post.id}`}
-                        >
-                          <Reply className="w-4 h-4 mr-2" />
-                          Reply
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPost(post);
+                            setReplyingTo((prev) => (prev === post.id ? null : post.id));
                           }}
                           data-testid={`button-view-comments-${post.id}`}
                         >
@@ -1024,7 +964,12 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
 
         {/* Detailed Post View Dialog */}
         {selectedPost && (
-          <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
+          <Dialog open={!!selectedPost} onOpenChange={(open) => {
+            if (!open) {
+              setSelectedPost(null);
+              setReplyingTo(null);
+            }
+          }}>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-post-detail">
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-3">
@@ -1112,8 +1057,6 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                     onClick={(e) => {
                       e.stopPropagation();
                       handleLikePost(selectedPost.id);
-                      // Update the selectedPost to reflect the change
-                      setSelectedPost((prev: CommunityPost | null) => prev ? { ...prev, liked: !prev.liked, likesCount: prev.liked ? prev.likesCount - 1 : prev.likesCount + 1 } : null);
                     }}
                     className={`${selectedPost.liked ? 'text-red-500' : ''}`}
                     data-testid="detailed-button-like"
@@ -1125,6 +1068,11 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!selectedPost) return;
+                      setReplyingTo((prev) => (prev === selectedPost.id ? null : selectedPost.id));
+                    }}
                     data-testid="detailed-button-reply"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
@@ -1142,36 +1090,37 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                   <h4 className="font-semibold text-sm text-muted-foreground">
                     {selectedPost.replies.length > 0 ? `${selectedPost.replies.length} ${selectedPost.replies.length === 1 ? 'Reply' : 'Replies'}` : 'No replies yet'}
                   </h4>
-                  
-                  {/* Add Reply Box */}
-                  <div className="p-4 border border-border rounded-lg bg-muted/10">
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={currentUser.avatar || undefined} />
-                        <AvatarFallback className="text-xs">{currentUser.displayName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <Textarea
-                          placeholder="Write a reply..."
-                          value={replyContent}
-                          onChange={(e) => setReplyContent(e.target.value)}
-                          className="mb-3 min-h-16"
-                          data-testid="detailed-textarea-reply"
-                        />
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleReply(selectedPost.id)}
-                            disabled={!replyContent.trim()}
-                            data-testid="detailed-button-submit-reply"
-                          >
-                            <Send className="w-4 h-4 mr-2" />
-                            Reply
-                          </Button>
+
+                  {replyingTo === selectedPost.id && (
+                    <div className="p-4 border border-border rounded-lg bg-muted/10">
+                      <div className="flex items-start space-x-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={currentUser.avatar || undefined} />
+                          <AvatarFallback className="text-xs">{currentUser.displayName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <Textarea
+                            placeholder="Write a reply..."
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                            className="mb-3 min-h-16"
+                            data-testid="detailed-textarea-reply"
+                          />
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleReply(selectedPost.id)}
+                              disabled={!replyContent.trim()}
+                              data-testid="detailed-button-submit-reply"
+                            >
+                              <Send className="w-4 h-4 mr-2" />
+                              Reply
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Display Existing Replies */}
                   {selectedPost.replies.length > 0 && (
