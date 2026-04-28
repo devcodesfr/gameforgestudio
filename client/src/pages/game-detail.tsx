@@ -1,74 +1,87 @@
 import { useParams, useLocation, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Home, ChevronRight, ArrowLeft } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ShoppingCart, Home, ChevronRight, ArrowLeft, Check, UserRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Project } from "@shared/schema";
+import { getGameCover, getGamePrice, toGameCartItem, useGameCart } from "@/hooks/use-game-cart";
 
 interface GameDetailPageProps {
   sidebarCollapsed?: boolean;
 }
 
-// Helper function to get mock price
-const getGamePrice = (gameName: string): number => {
-  const hash = gameName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const prices = [9.99, 14.99, 19.99, 24.99, 29.99, 39.99, 49.99];
-  return prices[hash % prices.length];
-};
+interface GameLibraryItem {
+  gameId: string;
+}
+
+interface UserPreview {
+  id: string;
+  displayName: string;
+}
+
+function getAuthorIds(game: Project) {
+  return Array.from(new Set([game.ownerId, ...game.teamMembers].filter(Boolean)));
+}
+
+function formatAuthors(game: Project, usersById: Map<string, UserPreview>) {
+  const names = getAuthorIds(game)
+    .map((id) => usersById.get(id)?.displayName)
+    .filter(Boolean);
+
+  if (names.length > 0) {
+    return names.join(", ");
+  }
+
+  return "GameForge Creator";
+}
 
 export default function GameDetailPage({ sidebarCollapsed = false }: GameDetailPageProps) {
   const { gameId } = useParams();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const gameCart = useGameCart();
 
   // Fetch all games and find the specific one
   const { data: allGames = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
 
-  const game = allGames.find(g => g.id === gameId);
-  const price = game ? getGamePrice(game.name) : 0;
-
-  // Buy Now mutation (immediate purchase)
-  const buyNowMutation = useMutation({
-    mutationFn: async () => {
-      if (!game) throw new Error("Game not found");
-      return apiRequest("POST", "/api/library", {
-        game_id: game.id,
-        game_name: game.name,
-        game_icon: game.icon,
-        game_description: game.description,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/library"] });
-      toast({
-        title: "Game purchased!",
-        description: "Game has been added to your library.",
-      });
-      navigate("/library");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Purchase failed",
-        description: error.message || "Please try again later.",
-        variant: "destructive",
-      });
-    },
+  const { data: library = [] } = useQuery<GameLibraryItem[]>({
+    queryKey: ["/api/library"],
   });
 
+  const game = allGames.find(g => g.id === gameId);
+  const price = game ? getGamePrice(game.name) : 0;
+  const owned = Boolean(game && library.some((item) => item.gameId === game.id));
+  const inCart = Boolean(game && gameCart.isInCart(game.id));
+  const coverImage = game ? getGameCover(game) : undefined;
+  const authorIds = game ? getAuthorIds(game).join(",") : "";
+
+  const { data: authors = [] } = useQuery<UserPreview[]>({
+    queryKey: [`/api/users/public?ids=${authorIds}`],
+    enabled: authorIds.length > 0,
+  });
+
+  const usersById = useMemo(() => {
+    return new Map(authors.map((author) => [author.id, author]));
+  }, [authors]);
+
   const handleBuyNow = () => {
-    buyNowMutation.mutate();
+    if (!game || owned) return;
+    gameCart.addItem(toGameCartItem(game));
+    navigate("/store/cart");
   };
 
   const handleAddToCart = () => {
+    if (!game || owned) return;
+    const added = gameCart.addItem(toGameCartItem(game));
     toast({
-      title: "Coming soon!",
-      description: "Shopping cart feature will be available soon.",
+      title: added ? "Added to cart" : "Already in cart",
+      description: added ? `${game.name} is ready for checkout.` : `${game.name} is already in your cart.`,
     });
   };
 
@@ -133,9 +146,15 @@ export default function GameDetailPage({ sidebarCollapsed = false }: GameDetailP
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Left Column - Game Details */}
               <div className="lg:col-span-2">
-                {/* Game Icon Large */}
-                <div className="flex items-center justify-center mb-6 p-12 bg-gradient-to-br from-primary/10 to-purple-500/10 rounded-2xl">
-                  <span className="text-9xl">{game.icon}</span>
+                {/* Game Cover Large */}
+                <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 to-purple-500/10">
+                  {coverImage ? (
+                    <img src={coverImage} alt={game.name} className="h-80 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-80 items-center justify-center">
+                      <span className="text-9xl">{game.icon}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Game Info */}
@@ -151,6 +170,13 @@ export default function GameDetailPage({ sidebarCollapsed = false }: GameDetailP
 
                   {/* Game Details */}
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-2">Author</h3>
+                      <div className="flex items-center gap-2 text-foreground">
+                        <UserRound className="h-4 w-4 text-primary" />
+                        <span>{formatAuthors(game, usersById)}</span>
+                      </div>
+                    </div>
                     <div>
                       <h3 className="text-sm font-semibold text-muted-foreground mb-2">Engine</h3>
                       <Badge variant="secondary">{game.engine}</Badge>
@@ -158,14 +184,6 @@ export default function GameDetailPage({ sidebarCollapsed = false }: GameDetailP
                     <div>
                       <h3 className="text-sm font-semibold text-muted-foreground mb-2">Platform</h3>
                       <Badge variant="outline">{game.platform}</Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground mb-2">Status</h3>
-                      <Badge className="bg-green-500 hover:bg-green-600">{game.status}</Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground mb-2">Team</h3>
-                      <p className="text-foreground">{game.teamMembers.length} members</p>
                     </div>
                   </div>
                 </div>
@@ -183,36 +201,40 @@ export default function GameDetailPage({ sidebarCollapsed = false }: GameDetailP
 
                   {/* Action Buttons */}
                   <div className="space-y-3 mb-6">
-                    <Button 
-                      onClick={handleBuyNow}
-                      disabled={buyNowMutation.isPending}
-                      className="w-full bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
-                      size="lg"
-                      data-testid="button-buy-now"
-                    >
-                      {buyNowMutation.isPending ? "Processing..." : "Buy Now"}
-                    </Button>
+                    {owned ? (
+                      <Button disabled className="w-full" size="lg" data-testid="button-owned">
+                        <Check className="w-5 h-5 mr-2" />
+                        Owned
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={handleBuyNow}
+                          className="w-full bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
+                          size="lg"
+                          data-testid="button-buy-now"
+                        >
+                          Buy Now
+                        </Button>
 
-                    <Button 
-                      onClick={handleAddToCart}
-                      variant="outline"
-                      className="w-full"
-                      size="lg"
-                      data-testid="button-add-to-cart"
-                    >
-                      <ShoppingCart className="w-5 h-5 mr-2" />
-                      Add to Cart
-                    </Button>
+                        <Button
+                          onClick={handleAddToCart}
+                          variant="outline"
+                          className="w-full"
+                          size="lg"
+                          data-testid="button-add-to-cart"
+                        >
+                          <ShoppingCart className="w-5 h-5 mr-2" />
+                          {inCart ? "In Cart" : "Add to Cart"}
+                        </Button>
+                      </>
+                    )}
                   </div>
 
                   <Separator className="mb-6" />
 
                   {/* Additional Info */}
                   <div className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Release Type</span>
-                      <span className="font-medium">{game.status}</span>
-                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Platform</span>
                       <span className="font-medium">{game.platform}</span>

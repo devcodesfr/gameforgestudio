@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,11 +22,13 @@ import {
   Sparkles,
   Reply
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { calendarIntegration } from '@/lib/calendar-integration';
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+
+const COMMUNITY_POSTS_STORAGE_KEY = 'gameforge-community-posts';
 
 interface CommunityPageProps {
   sidebarCollapsed?: boolean;
@@ -142,62 +145,122 @@ const MOCK_POSTS: CommunityPost[] = [
   }
 ];
 
+function normalizePost(post: CommunityPost): CommunityPost {
+  const replies = post.replies?.map((reply: CommunityReply) => ({
+    ...reply,
+    createdAt: new Date(reply.createdAt),
+  })) || [];
+
+  return {
+    ...post,
+    replies,
+    repliesCount: replies.length,
+    createdAt: new Date(post.createdAt),
+    event: post.event ? {
+      ...post.event,
+      startDate: new Date(post.event.startDate),
+      endDate: post.event.endDate ? new Date(post.event.endDate) : undefined,
+    } : undefined,
+  };
+}
+
+function loadCommunityPosts() {
+  const savedPosts = localStorage.getItem(COMMUNITY_POSTS_STORAGE_KEY);
+  if (!savedPosts) {
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H4,H5',location:'client/src/pages/community.tsx:loadCommunityPosts-empty',message:'community posts loaded from mock fallback',data:{postCount:MOCK_POSTS.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return MOCK_POSTS.map(normalizePost);
+  }
+
+  try {
+    const parsed = JSON.parse(savedPosts) as CommunityPost[];
+    const normalizedPosts = parsed.map(normalizePost);
+    const newestPost = normalizedPosts[0];
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H4,H5',location:'client/src/pages/community.tsx:loadCommunityPosts-saved',message:'community posts loaded from storage',data:{postCount:normalizedPosts.length,storageLength:savedPosts.length,newestPostId:newestPost?.id || null,newestAvatarShape:newestPost?.author.avatar ? {length:newestPost.author.avatar.length,isUrl:newestPost.author.avatar.startsWith('http'),prefix:newestPost.author.avatar.slice(0,8)} : null,newestRepliesCount:newestPost?.replies.length || 0},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return normalizedPosts;
+  } catch (error) {
+    console.warn('Failed to parse saved posts, using default data');
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H5',location:'client/src/pages/community.tsx:loadCommunityPosts-error',message:'community storage parse failed',data:{errorName:error instanceof Error ? error.name : typeof error,errorMessage:error instanceof Error ? error.message : String(error),storageLength:savedPosts.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return MOCK_POSTS.map(normalizePost);
+  }
+}
+
+function mergeCommunityPosts(primaryPosts: CommunityPost[], secondaryPosts: CommunityPost[]) {
+  const merged = new Map<string, CommunityPost>();
+  [...primaryPosts, ...secondaryPosts].forEach((post) => {
+    merged.set(post.id, normalizePost(post));
+  });
+
+  return Array.from(merged.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+function shouldShowAuthorTag(role?: string) {
+  if (!role) return false;
+  const normalizedRole = role.toLowerCase();
+  return normalizedRole !== 'regular' && normalizedRole !== 'gamer';
+}
+
+function getAuthorTag(role?: string) {
+  return shouldShowAuthorTag(role) ? (
+    <Badge variant="secondary" className="text-xs">{role}</Badge>
+  ) : null;
+}
+
+function formatRelativeTime(date: Date | string) {
+  const timestamp = new Date(date).getTime();
+  if (Number.isNaN(timestamp)) return 'just now';
+
+  const diffInSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffInSeconds < 60) return 'just now';
+
+  const units = [
+    { label: 'yr', plural: 'yrs', seconds: 365 * 24 * 60 * 60 },
+    { label: 'month', plural: 'months', seconds: 30 * 24 * 60 * 60 },
+    { label: 'day', plural: 'days', seconds: 24 * 60 * 60 },
+    { label: 'hr', plural: 'hrs', seconds: 60 * 60 },
+    { label: 'min', plural: 'mins', seconds: 60 },
+  ];
+
+  const unit = units.find((item) => diffInSeconds >= item.seconds)!;
+  const value = Math.floor(diffInSeconds / unit.seconds);
+  return `${value} ${value === 1 ? unit.label : unit.plural} ago`;
+}
+
+function isImageAvatar(avatar?: string) {
+  if (!avatar) return false;
+  return avatar.startsWith('http') || avatar.startsWith('/') || avatar.startsWith('data:image');
+}
+
+function AuthorAvatar({ author, className = "w-10 h-10", fallbackClassName = "text-sm" }: { author: CommunityAuthor; className?: string; fallbackClassName?: string }) {
+  const initials = author.displayName?.split(' ').map((name) => name[0]).join('').slice(0, 2) || '?';
+
+  return (
+    <Avatar className={className}>
+      {isImageAvatar(author.avatar) && <AvatarImage src={author.avatar} />}
+      <AvatarFallback className={fallbackClassName}>
+        {author.avatar && !isImageAvatar(author.avatar) ? author.avatar : initials}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
 export default function CommunityPage({ sidebarCollapsed = false }: CommunityPageProps) {
   // Get real authenticated user data
   const userQuery = useCurrentUser();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
-  // Handle loading state
-  if (userQuery.isLoading) {
-    return (
-      <div className={`min-h-screen bg-background transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-        <div className="container mx-auto px-6 py-8">
-          <div className="text-center text-muted-foreground">Loading community...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle unauthenticated state
-  if (!userQuery.data) {
-    return (
-      <div className={`min-h-screen bg-background transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-        <div className="container mx-auto px-6 py-8">
-          <div className="text-center text-muted-foreground">Please login to access the community</div>
-        </div>
-      </div>
-    );
-  }
-
   const currentUser = userQuery.data;
 
   // Initialize posts from localStorage or fallback to MOCK_POSTS
-  const [posts, setPosts] = useState<CommunityPost[]>(() => {
-    const savedPosts = localStorage.getItem('gameforge-community-posts');
-    if (savedPosts) {
-      try {
-        const parsed = JSON.parse(savedPosts);
-        // Convert date strings back to Date objects
-        return parsed.map((post: CommunityPost) => ({
-          ...post,
-          createdAt: new Date(post.createdAt),
-          event: post.event ? {
-            ...post.event,
-            startDate: new Date(post.event.startDate),
-            endDate: post.event.endDate ? new Date(post.event.endDate) : undefined,
-          } : undefined,
-          replies: post.replies?.map((reply: CommunityReply) => ({
-            ...reply,
-            createdAt: new Date(reply.createdAt)
-          })) || []
-        }));
-      } catch (error) {
-        console.warn('Failed to parse saved posts, using default data');
-        return MOCK_POSTS;
-      }
-    }
-    return MOCK_POSTS;
+  const [posts, setPosts] = useState<CommunityPost[]>(loadCommunityPosts);
+  const { data: sharedPosts = [] } = useQuery<CommunityPost[]>({
+    queryKey: ['/api/community/posts'],
+    refetchInterval: 3000,
   });
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState<'text' | 'event'>('text');
@@ -215,8 +278,60 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
 
   // Save posts to localStorage whenever posts change
   useEffect(() => {
-    localStorage.setItem('gameforge-community-posts', JSON.stringify(posts));
+    localStorage.setItem(COMMUNITY_POSTS_STORAGE_KEY, JSON.stringify(posts));
+    const newestPost = posts[0];
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H3,H5',location:'client/src/pages/community.tsx:save-posts-effect',message:'community posts saved to storage',data:{postCount:posts.length,newestPostId:newestPost?.id || null,newestAuthorRole:newestPost?.author.role || null,newestAvatarShape:newestPost?.author.avatar ? {length:newestPost.author.avatar.length,isUrl:newestPost.author.avatar.startsWith('http'),prefix:newestPost.author.avatar.slice(0,8)} : null,newestContentLength:newestPost?.content.length || 0,newestRepliesCount:newestPost?.replies.length || 0},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   }, [posts]);
+
+  useEffect(() => {
+    if (sharedPosts.length === 0) return;
+
+    const normalizedSharedPosts = sharedPosts.map(normalizePost);
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H11,H13',location:'client/src/pages/community.tsx:shared-posts-like-state',message:'shared community posts like state received',data:{sharedCount:normalizedSharedPosts.length,newestSharedPostId:normalizedSharedPosts[0]?.id || null,newestLikesCount:normalizedSharedPosts[0]?.likesCount ?? null,newestLiked:normalizedSharedPosts[0]?.liked ?? null,topPosts:normalizedSharedPosts.slice(0,3).map((post) => ({id:post.id,likesCount:post.likesCount,liked:post.liked}))},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    setPosts((currentPosts) => mergeCommunityPosts(normalizedSharedPosts, currentPosts));
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-post-fix',hypothesisId:'H3,H4',location:'client/src/pages/community.tsx:shared-posts-merge',message:'shared community posts merged from api',data:{sharedCount:normalizedSharedPosts.length,newestSharedPostId:normalizedSharedPosts[0]?.id || null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [sharedPosts]);
+
+  useEffect(() => {
+    const syncCommunityPosts = (source: string) => {
+      const syncedPosts = loadCommunityPosts();
+      // #region agent log
+      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H3,H4',location:'client/src/pages/community.tsx:syncCommunityPosts',message:'community posts sync requested',data:{source,syncedCount:syncedPosts.length,newestPostId:syncedPosts[0]?.id || null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      setPosts((currentPosts) => mergeCommunityPosts(syncedPosts, currentPosts));
+    };
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === COMMUNITY_POSTS_STORAGE_KEY) {
+        syncCommunityPosts('storage');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    const handleFocus = () => syncCommunityPosts('focus');
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPost) return;
+
+    const updatedPost = posts.find((post) => post.id === selectedPost.id);
+    if (!updatedPost) {
+      setSelectedPost(null);
+    } else if (updatedPost !== selectedPost) {
+      setSelectedPost(updatedPost);
+    }
+  }, [posts, selectedPost]);
 
   const filteredPosts = posts.filter((post) => {
     if (filter === 'posts') return post.type === 'text';
@@ -224,17 +339,59 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
     return true;
   });
 
-  const handleLikePost = (postId: string) => {
+  useEffect(() => {
+    const newestPost = filteredPosts[0];
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H1,H2,H4',location:'client/src/pages/community.tsx:filtered-posts-render',message:'community filtered posts rendered',data:{filter,visibleCount:filteredPosts.length,newestPostId:newestPost?.id || null,newestAuthorRole:newestPost?.author.role || null,newestAvatarShape:newestPost?.author.avatar ? {length:newestPost.author.avatar.length,isUrl:newestPost.author.avatar.startsWith('http'),prefix:newestPost.author.avatar.slice(0,8)} : null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [filter, posts]);
+
+  useEffect(() => {
+    const bodyText = document.body.innerText || '';
+    const dataImageIndex = bodyText.indexOf('data:image');
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-dom-check',hypothesisId:'H6,H7,H8',location:'client/src/pages/community.tsx:visible-dom-scan',message:'community visible text scanned for data image string',data:{hasVisibleDataImage:dataImageIndex >= 0,visibleTextLength:bodyText.length,visibleDataImageSnippet:dataImageIndex >= 0 ? bodyText.slice(dataImageIndex, dataImageIndex + 32) : null,newestPostId:filteredPosts[0]?.id || null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [filteredPosts]);
+
+  const applyLocalLike = (postId: string) => {
     setPosts((prev) => prev.map((post) => {
       if (post.id === postId) {
-        return {
+        const updatedPost = {
           ...post,
           liked: !post.liked,
           likesCount: post.liked ? post.likesCount - 1 : post.likesCount + 1
         };
+        // #region agent log
+        fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H9,H10,H12,H13',location:'client/src/pages/community.tsx:handleLikePost-local-update',message:'community post like updated local state',data:{postId,beforeLikesCount:post.likesCount,beforeLiked:post.liked,afterLikesCount:updatedPost.likesCount,afterLiked:updatedPost.liked},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        return {
+          ...updatedPost
+        };
       }
       return post;
     }));
+  };
+
+  const handleLikePost = async (postId: string) => {
+    const existingPost = posts.find((post) => post.id === postId);
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H9,H10,H12,H13',location:'client/src/pages/community.tsx:handleLikePost-entry',message:'community post like clicked',data:{postId,foundPost:Boolean(existingPost),beforeLikesCount:existingPost?.likesCount ?? null,beforeLiked:existingPost?.liked ?? null,selectedPostId:selectedPost?.id || null,selectedPostLikesCount:selectedPost?.likesCount ?? null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    try {
+      const response = await apiRequest('POST', `/api/community/posts/${postId}/like`);
+      const updatedPost = normalizePost(await response.json());
+      setPosts((prev) => mergeCommunityPosts([updatedPost], prev));
+      // #region agent log
+      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-post-fix',hypothesisId:'H9,H10,H11,H13',location:'client/src/pages/community.tsx:handleLikePost-api-success',message:'community post like updated through shared api',data:{postId:updatedPost.id,likesCount:updatedPost.likesCount,liked:updatedPost.liked},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    } catch (error) {
+      // Older local-only posts can still be liked privately until they are recreated through the shared API.
+      applyLocalLike(postId);
+      // #region agent log
+      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-post-fix',hypothesisId:'H9,H10,H11,H13',location:'client/src/pages/community.tsx:handleLikePost-api-error',message:'shared like failed, fell back to local like',data:{postId,errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    }
   };
 
   const handleLikeReply = (postId: string, replyId: string) => {
@@ -267,7 +424,7 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
   };
 
   const handleReply = (postId: string) => {
-    if (!replyContent.trim()) return;
+    if (!currentUser || !replyContent.trim()) return;
 
     const newReply: CommunityReply = {
       id: `reply-${Date.now()}`,
@@ -287,10 +444,11 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
 
     setPosts((prev) => prev.map((post) => {
       if (post.id === postId) {
+        const replies = [...post.replies, newReply];
         updatedPost = {
           ...post,
-          replies: [...post.replies, newReply],
-          repliesCount: post.repliesCount + 1
+          replies,
+          repliesCount: replies.length
         };
         return updatedPost;
       }
@@ -343,10 +501,15 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
     setLocation('/calendar');
   };
 
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     console.log('handleCreatePost called', { newPostContent: newPostContent.trim(), newPostType, eventTitle });
+    if (!currentUser) return;
     if (newPostType === 'event' && !eventTitle) return;
     if (newPostType !== 'event' && !newPostContent.trim()) return;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H1,H2,H5',location:'client/src/pages/community.tsx:handleCreatePost-entry',message:'developer community post create started',data:{userRole:currentUser.role,hasJobTitle:Boolean(currentUser.jobTitle),avatarShape:currentUser.avatar ? {length:currentUser.avatar.length,isUrl:currentUser.avatar.startsWith('http'),prefix:currentUser.avatar.slice(0,8)} : null,postType:newPostType,contentLength:newPostContent.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
       let newPost: CommunityPost = {
         id: `post-${Date.now()}`,
@@ -364,6 +527,10 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
         liked: false,
         replies: [] as CommunityReply[],
       };
+
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-pre-fix',hypothesisId:'H1,H2,H5',location:'client/src/pages/community.tsx:handleCreatePost-newPost',message:'community post object created',data:{postId:newPost.id,authorRole:newPost.author.role || null,avatarShape:newPost.author.avatar ? {length:newPost.author.avatar.length,isUrl:newPost.author.avatar.startsWith('http'),prefix:newPost.author.avatar.slice(0,8)} : null,contentLength:newPost.content.length,repliesCount:newPost.replies.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     if (newPostType === 'event' && eventTitle) {
       console.log('Creating event post', { eventTitle, eventType, eventDate, eventLocation });
@@ -418,7 +585,25 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
         };
       }
 
-    setPosts(prev => [newPost, ...prev]);
+    try {
+      const response = await apiRequest('POST', '/api/community/posts', {
+        content: newPost.content,
+        type: newPost.type,
+        event: newPost.event,
+      });
+      const sharedPost = normalizePost(await response.json());
+      setPosts((prev) => mergeCommunityPosts([sharedPost], prev));
+      // #region agent log
+      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-dev-post-post-fix',hypothesisId:'H3,H4',location:'client/src/pages/community.tsx:handleCreatePost-api-success',message:'community post created through shared api',data:{postId:sharedPost.id,authorRole:sharedPost.author.role || null,avatarShape:sharedPost.author.avatar ? {length:sharedPost.author.avatar.length,isUrl:sharedPost.author.avatar.startsWith('http'),prefix:sharedPost.author.avatar.slice(0,8)} : null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    } catch (error) {
+      toast({
+        title: "Post failed",
+        description: error instanceof Error ? error.message : "Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Reset form
     setNewPostContent('');
@@ -446,6 +631,26 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
       default: return '📅';
     }
   };
+
+  if (userQuery.isLoading) {
+    return (
+      <div className={`min-h-screen bg-background transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+        <div className="container mx-auto px-6 py-8">
+          <div className="text-center text-muted-foreground">Loading community...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className={`min-h-screen bg-background transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+        <div className="container mx-auto px-6 py-8">
+          <div className="text-center text-muted-foreground">Please login to access the community</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -493,7 +698,7 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="font-semibold">{currentUser.displayName}</span>
-                    <Badge variant="secondary" className="text-xs">{currentUser.jobTitle || currentUser.role}</Badge>
+                    {getAuthorTag(currentUser.jobTitle || currentUser.role)}
                   </div>
                   
                   <Textarea
@@ -587,15 +792,13 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
               {filteredPosts.map(post => (
                 <Card key={post.id} className="p-6" data-testid={`post-${post.id}`}>
                   <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-2xl">
-                      {post.author.avatar}
-                    </div>
+                    <AuthorAvatar author={post.author} className="w-12 h-12" fallbackClassName="text-sm bg-blue-100 dark:bg-blue-900" />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
                         <span className="font-semibold">{post.author.displayName}</span>
-                        <Badge variant="secondary" className="text-xs">{post.author.role}</Badge>
+                        {getAuthorTag(post.author.role)}
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(post.createdAt, { addSuffix: true })}
+                          {formatRelativeTime(post.createdAt)}
                         </span>
                       </div>
 
@@ -705,7 +908,7 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                           data-testid={`button-view-comments-${post.id}`}
                         >
                           <MessageCircle className="w-4 h-4 mr-2" />
-                          {post.repliesCount} {post.repliesCount === 1 ? 'Comment' : 'Comments'}
+                          {post.replies.length} {post.replies.length === 1 ? 'Reply' : 'Replies'}
                         </Button>
                         
                         <Button 
@@ -761,16 +964,14 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                       {/* Replies */}
                       {post.replies.length > 0 && (
                         <div className="mt-4 space-y-4">
-                          {post.replies.map((reply: CommunityReply) => (
+                          {post.replies.slice(0, 2).map((reply: CommunityReply) => (
                             <div key={reply.id} className="flex items-start space-x-3 pl-4 border-l-2 border-border">
-                              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-sm">
-                                {reply.author.avatar}
-                              </div>
+                              <AuthorAvatar author={reply.author} className="w-8 h-8" fallbackClassName="text-xs bg-blue-100 dark:bg-blue-900" />
                               <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-1">
                                   <span className="font-medium text-sm">{reply.author.displayName}</span>
                                   <span className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(reply.createdAt, { addSuffix: true })}
+                                    {formatRelativeTime(reply.createdAt)}
                                   </span>
                                 </div>
                                 <p className="text-sm mb-2" data-testid={`reply-content-${reply.id}`}>
@@ -792,6 +993,15 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                               </div>
                             </div>
                           ))}
+                          {post.replies.length > 2 && (
+                            <button
+                              type="button"
+                              className="pl-4 text-sm font-medium text-primary hover:underline"
+                              onClick={() => setSelectedPost(post)}
+                            >
+                              View all {post.replies.length} replies
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -818,15 +1028,13 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-post-detail">
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-lg">
-                    {selectedPost.author.avatar}
-                  </div>
+                  <AuthorAvatar author={selectedPost.author} className="w-10 h-10" fallbackClassName="text-sm bg-blue-100 dark:bg-blue-900" />
                   <div>
                     <span className="font-semibold">{selectedPost.author.displayName}</span>
                     <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Badge variant="secondary" className="text-xs">{selectedPost.author.role}</Badge>
-                      <span>•</span>
-                      <span>{formatDistanceToNow(selectedPost.createdAt, { addSuffix: true })}</span>
+                      {getAuthorTag(selectedPost.author.role)}
+                      {shouldShowAuthorTag(selectedPost.author.role) && <span>•</span>}
+                      <span>{formatRelativeTime(selectedPost.createdAt)}</span>
                     </div>
                   </div>
                 </DialogTitle>
@@ -920,7 +1128,7 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                     data-testid="detailed-button-reply"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
-                    {selectedPost.repliesCount} {selectedPost.repliesCount === 1 ? 'Reply' : 'Replies'}
+                    {selectedPost.replies.length} {selectedPost.replies.length === 1 ? 'Reply' : 'Replies'}
                   </Button>
                   
                   <Button variant="ghost" size="sm" data-testid="detailed-button-share">
@@ -929,10 +1137,10 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                   </Button>
                 </div>
 
-                {/* Detailed Comments/Replies Section */}
+                {/* Detailed Replies Section */}
                 <div className="space-y-4">
                   <h4 className="font-semibold text-sm text-muted-foreground">
-                    {selectedPost.repliesCount > 0 ? `${selectedPost.repliesCount} ${selectedPost.repliesCount === 1 ? 'Reply' : 'Replies'}` : 'No replies yet'}
+                    {selectedPost.replies.length > 0 ? `${selectedPost.replies.length} ${selectedPost.replies.length === 1 ? 'Reply' : 'Replies'}` : 'No replies yet'}
                   </h4>
                   
                   {/* Add Reply Box */}
@@ -970,14 +1178,12 @@ export default function CommunityPage({ sidebarCollapsed = false }: CommunityPag
                     <div className="space-y-4">
                       {selectedPost.replies.map((reply: CommunityReply) => (
                         <div key={reply.id} className="flex items-start space-x-3 p-4 border border-border rounded-lg">
-                          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-sm">
-                            {reply.author.avatar}
-                          </div>
+                          <AuthorAvatar author={reply.author} className="w-8 h-8" fallbackClassName="text-xs bg-blue-100 dark:bg-blue-900" />
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-2">
                               <span className="font-medium text-sm">{reply.author.displayName}</span>
                               <span className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(reply.createdAt, { addSuffix: true })}
+                                {formatRelativeTime(reply.createdAt)}
                               </span>
                             </div>
                             <p className="text-sm mb-3 leading-relaxed" data-testid={`detailed-reply-content-${reply.id}`}>

@@ -28,6 +28,7 @@ import GamerHomePage from "@/pages/gamer-home";
 import LibraryPage from "@/pages/library";
 import StorePage from "@/pages/store";
 import GameDetailPage from "@/pages/game-detail";
+import GameCartPage from "@/pages/game-cart";
 import { Card } from "@/components/ui/card";
 
 // Placeholder components for other sections
@@ -255,6 +256,9 @@ function AppWithSidebar() {
       </Route>
       <Route path="/library">
         <LibraryPage sidebarCollapsed={sidebarCollapsed} />
+      </Route>
+      <Route path="/store/cart">
+        <GameCartPage sidebarCollapsed={sidebarCollapsed} />
       </Route>
       <Route path="/store">
         <StorePage sidebarCollapsed={sidebarCollapsed} />

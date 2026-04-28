@@ -19,6 +19,49 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
+type CommunityAuthor = {
+  displayName: string;
+  avatar?: string | null;
+  role?: string | null;
+};
+
+type CommunityReply = {
+  id: string;
+  authorId: string;
+  author: CommunityAuthor;
+  content: string;
+  likesCount: number;
+  createdAt: Date;
+  liked: boolean;
+};
+
+type CommunityPost = {
+  id: string;
+  authorId: string;
+  author: CommunityAuthor;
+  content: string;
+  type: "text" | "event";
+  likesCount: number;
+  repliesCount: number;
+  createdAt: Date;
+  liked: boolean;
+  replies: CommunityReply[];
+  eventId?: string;
+  event?: {
+    id: string;
+    title: string;
+    type: "virtual" | "in-person" | "release";
+    startDate: Date;
+    endDate?: Date;
+    location: string;
+    rsvpCount: number;
+    maxAttendees: number;
+  };
+  likedByUserIds?: string[];
+};
+
+const sharedCommunityPosts: CommunityPost[] = [];
+
 // Extend the session to include user
 declare module "express-session" {
   interface SessionData {
@@ -351,6 +394,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get public user profiles for project author display
+  app.get("/api/users/public", async (req: Request, res: Response) => {
+    try {
+      const idsParam = typeof req.query.ids === "string" ? req.query.ids : "";
+      const ids = Array.from(new Set(idsParam.split(",").map((id) => id.trim()).filter(Boolean)));
+
+      if (ids.length === 0) {
+        return res.json([]);
+      }
+
+      const users = await Promise.all(ids.map((id) => storage.getUser(id)));
+      res.json(users.filter(Boolean).map((user) => ({
+        id: user!.id,
+        username: user!.username,
+        displayName: user!.displayName,
+        avatar: user!.avatar,
+        role: user!.role,
+        jobTitle: user!.jobTitle,
+      })));
+    } catch (error) {
+      console.error("Error fetching public users:", error);
+      res.status(500).json({ message: "Failed to fetch public users" });
+    }
+  });
+
   // Get all projects
   app.get("/api/projects", async (req, res) => {
     try {
@@ -634,6 +702,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching purchases:", error);
       res.status(500).json({ message: "Failed to fetch purchases" });
+    }
+  });
+
+  // ===== SHARED COMMUNITY API ENDPOINTS =====
+
+  app.get("/api/community/posts", async (req: Request, res: Response) => {
+    const userId = req.session.userId;
+    const postsForUser = sharedCommunityPosts.map((post) => ({
+      ...post,
+      liked: Boolean(userId && post.likedByUserIds?.includes(userId)),
+      likesCount: post.likedByUserIds?.length ?? post.likesCount,
+    }));
+    // #region agent log
+    fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-pre-fix',hypothesisId:'H9,H11,H13',location:'server/routes.ts:get-community-posts',message:'shared community posts served',data:{postCount:postsForUser.length,newestPostId:postsForUser[0]?.id || null,newestLikesCount:postsForUser[0]?.likesCount ?? null,newestLiked:postsForUser[0]?.liked ?? null,topPosts:postsForUser.slice(0,3).map((post) => ({id:post.id,likesCount:post.likesCount,liked:post.liked}))},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    res.json(postsForUser);
+  });
+
+  app.post("/api/community/posts", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const { content, type = "text", event } = req.body;
+      if (type !== "event" && (!content || typeof content !== "string" || !content.trim())) {
+        return res.status(400).json({ message: "Post content is required" });
+      }
+
+      if (type === "event" && (!event?.title || typeof event.title !== "string")) {
+        return res.status(400).json({ message: "Event title is required" });
+      }
+
+      const postId = `post-${Date.now()}`;
+      const post: CommunityPost = {
+        id: postId,
+        authorId: user.id,
+        author: {
+          displayName: user.displayName,
+          avatar: user.avatar,
+          role: user.jobTitle || user.role,
+        },
+        content: typeof content === "string" ? content : "",
+        type,
+        likesCount: 0,
+        repliesCount: 0,
+        createdAt: new Date(),
+        liked: false,
+        replies: [],
+        likedByUserIds: [],
+      };
+
+      if (type === "event" && event) {
+        post.eventId = `event-${Date.now()}`;
+        const startDate = event.startDate ? new Date(event.startDate) : new Date();
+        post.event = {
+          id: post.eventId,
+          title: event.title,
+          type: event.type || "virtual",
+          startDate,
+          endDate: event.endDate ? new Date(event.endDate) : undefined,
+          location: event.location || "",
+          rsvpCount: 0,
+          maxAttendees: event.maxAttendees || 100,
+        };
+      }
+
+      sharedCommunityPosts.unshift(post);
+      res.status(201).json(post);
+    } catch (error) {
+      console.error("Error creating community post:", error);
+      res.status(500).json({ message: "Failed to create community post" });
+    }
+  });
+
+  app.post("/api/community/posts/:postId/like", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const post = sharedCommunityPosts.find((item) => item.id === req.params.postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      const likedByUserIds = post.likedByUserIds || [];
+      const alreadyLiked = likedByUserIds.includes(req.session.userId);
+      post.likedByUserIds = alreadyLiked
+        ? likedByUserIds.filter((userId) => userId !== req.session.userId)
+        : [...likedByUserIds, req.session.userId];
+      post.likesCount = post.likedByUserIds.length;
+      post.liked = !alreadyLiked;
+
+      const responsePost = {
+        ...post,
+        liked: !alreadyLiked,
+        likesCount: post.likedByUserIds.length,
+      };
+
+      // #region agent log
+      fetch('http://127.0.0.1:7855/ingest/e6e06c55-184c-447a-b3f0-43f18b3c62bc',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'59f846'},body:JSON.stringify({sessionId:'59f846',runId:'community-like-post-fix',hypothesisId:'H9,H11,H13',location:'server/routes.ts:like-community-post',message:'shared community post like toggled',data:{postId:post.id,alreadyLiked,likesCount:post.likesCount,likedByCount:post.likedByUserIds.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
+      res.json(responsePost);
+    } catch (error) {
+      console.error("Error liking community post:", error);
+      res.status(500).json({ message: "Failed to like post" });
     }
   });
 

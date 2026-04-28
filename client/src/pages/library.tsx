@@ -42,7 +42,6 @@ export default function LibraryPage({ sidebarCollapsed }: LibraryPageProps) {
   const [installedGames, setInstalledGames] = useState<Record<string, boolean>>({});
   const [favoriteGames, setFavoriteGames] = useState<Record<string, boolean>>({});
   const [archivedGames, setArchivedGames] = useState<Record<string, boolean>>({});
-  const [removedGames, setRemovedGames] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   
   // Fetch user's game library
@@ -97,12 +96,12 @@ export default function LibraryPage({ sidebarCollapsed }: LibraryPageProps) {
   };
 
   const visibleLibrary = useMemo(() => {
-    return sortLibraryItems((library || []).filter((item) => !removedGames[item.gameId] && !archivedGames[item.gameId]));
-  }, [archivedGames, favoriteGames, library, removedGames, sortBy]);
+    return sortLibraryItems((library || []).filter((item) => !archivedGames[item.gameId]));
+  }, [archivedGames, favoriteGames, library, sortBy]);
 
   const archivedLibrary = useMemo(() => {
-    return sortLibraryItems((library || []).filter((item) => !removedGames[item.gameId] && archivedGames[item.gameId]));
-  }, [archivedGames, favoriteGames, library, removedGames, sortBy]);
+    return sortLibraryItems((library || []).filter((item) => archivedGames[item.gameId]));
+  }, [archivedGames, favoriteGames, library, sortBy]);
 
   const setGameInstalled = (gameId: string, installed: boolean) => {
     setInstalledGames((current) => ({ ...current, [gameId]: installed }));
@@ -114,10 +113,6 @@ export default function LibraryPage({ sidebarCollapsed }: LibraryPageProps) {
 
   const toggleArchive = (gameId: string) => {
     setArchivedGames((current) => ({ ...current, [gameId]: !current[gameId] }));
-  };
-
-  const removeFromLibrary = (gameId: string) => {
-    setRemovedGames((current) => ({ ...current, [gameId]: true }));
   };
 
   const renderGameCard = (item: GameLibraryItem, isArchived = false) => {
@@ -173,10 +168,6 @@ export default function LibraryPage({ sidebarCollapsed }: LibraryPageProps) {
                     <Archive className="h-4 w-4" />
                     Unarchive
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => removeFromLibrary(item.gameId)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                    Remove from Library
-                  </DropdownMenuItem>
                 </>
               ) : installed ? (
                 <>
@@ -206,10 +197,6 @@ export default function LibraryPage({ sidebarCollapsed }: LibraryPageProps) {
                   <DropdownMenuItem onClick={() => toggleFavorite(item.gameId)}>
                     <Star className="h-4 w-4" />
                     {favorite ? "Unfavorite" : "Favorite"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => removeFromLibrary(item.gameId)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                    Remove from Library
                   </DropdownMenuItem>
                 </>
               )}
@@ -310,7 +297,7 @@ export default function LibraryPage({ sidebarCollapsed }: LibraryPageProps) {
                   <LibraryIcon className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
                   <h3 className="text-lg font-semibold">No active games</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Archived or removed games will not appear in your active library list.
+                    Archived games will not appear in your active library list.
                   </p>
                 </Card>
               )}
